@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leo do Corte — Apresentação do sistema</title>
+<meta name="description" content="Apresentação animada do sistema de agendamento, loja e painel da barbearia Leo do Corte.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c0c0f'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='17' font-weight='bold' text-anchor='middle' fill='%23d4af37'%3EL%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Apresentação animada — Leo do Corte
+   Palco fixo de 1920x1080 escalado por JS; cada cena anima
+   ao receber .is-active, e as animações reiniciam ao voltar.
+   ============================================================ */
+
+:root{
+  --black:#08080a; --ink:#0c0c10; --coal:#121217;
+  --graphite:#181820; --graphite-2:#20202a;
+  --line:#2a2a35; --line-soft:#1e1e27;
+  --gold:#d4af37; --gold-soft:#e7c967; --gold-dim:rgba(212,175,55,.14);
+  --text:#f3f1ec; --text-2:#b9b6ae; --text-3:#7d7a74;
+  --ok:#4ca771; --danger:#d9534f; --wa:#1fa855;
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --display:"Bebas Neue",Impact,"Haettenschweiler","Arial Narrow Bold",sans-serif;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none !important}
+
+html,body{height:100%}
+body{
+  margin:0;background:#000;color:var(--text);font-family:var(--font);
+  overflow:hidden;-webkit-font-smoothing:antialiased;
+}
+
+.viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden;background:#000}
+
+.stage{
+  position:relative;width:1920px;height:1080px;flex:0 0 auto;
+  transform-origin:center center;overflow:hidden;
+  background:
+    radial-gradient(1400px 700px at 80% -10%, rgba(212,175,55,.10), transparent 60%),
+    radial-gradient(900px 500px at 5% 5%, rgba(255,255,255,.04), transparent 60%),
+    var(--black);
+}
+.stage::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:40;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.016) 0 2px,transparent 2px 8px);
+}
+.vignette{
+  position:absolute;inset:0;pointer-events:none;z-index:39;
+  box-shadow:inset 0 0 220px 70px rgba(0,0,0,.72);
+}
+
+/* ---------------- Moldura fixa ---------------- */
+
+.frame-top{position:absolute;top:0;left:0;right:0;height:92px;z-index:30;display:flex;align-items:center;padding:0 62px;gap:16px}
+.mark{
+  width:52px;height:52px;display:grid;place-items:center;border-radius:14px;
+  background:linear-gradient(145deg,#1d1a12,#0e0e11);border:1px solid rgba(212,175,55,.45);
+  color:var(--gold);font-family:var(--display);font-size:2rem;line-height:1;padding-top:5px;
+}
+.mark-text{display:flex;flex-direction:column;line-height:1.08}
+.mark-text strong{font-family:var(--display);font-size:1.55rem;font-weight:400;letter-spacing:1.4px}
+.mark-text small{color:var(--gold);font-size:.62rem;letter-spacing:3.4px;text-transform:uppercase}
+
+.progress{position:absolute;top:0;left:0;right:0;height:4px;background:rgba(255,255,255,.06);z-index:31}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold-soft),var(--gold));box-shadow:0 0 14px rgba(212,175,55,.6)}
+
+.chapter{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--text-3);font-size:.82rem;letter-spacing:2.6px;text-transform:uppercase}
+.dots{display:flex;gap:7px}
+.dots b{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.16);transition:background .35s,transform .35s}
+.dots b.on{background:var(--gold);transform:scale(1.35)}
+
+/* ---------------- Cenas ---------------- */
+
+.scene{
+  position:absolute;inset:92px 0 0;z-index:10;
+  padding:40px 110px 90px;
+  display:flex;flex-direction:column;justify-content:center;
+  opacity:0;visibility:hidden;transition:opacity .45s ease,visibility .45s;
+}
+.scene.is-active{opacity:1;visibility:visible}
+
+.eyebrow{color:var(--gold);font-size:1rem;font-weight:600;letter-spacing:5px;text-transform:uppercase;margin-bottom:20px;display:block}
+.title{font-family:var(--display);font-weight:400;letter-spacing:2px;line-height:.98;margin:0}
+.t-xl{font-size:11rem}
+.t-lg{font-size:6rem}
+.t-md{font-size:4.1rem}
+.lead{font-size:1.65rem;line-height:1.55;color:var(--text-2);max-width:24ch;margin:0}
+.lead b{color:var(--text)}
+.gold{color:var(--gold)}
+
+/* motor de animação: nomes só valem na cena ativa, por isso reiniciam */
+.anim{animation-duration:.72s;animation-fill-mode:backwards;animation-timing-function:cubic-bezier(.22,.84,.28,1);animation-delay:var(--d,0s)}
+.is-active .up{animation-name:up}
+.is-active .down{animation-name:down}
+.is-active .fade{animation-name:fade}
+.is-active .pop{animation-name:pop}
+.is-active .left{animation-name:left}
+.is-active .right{animation-name:right}
+.is-active .wipe{animation-name:wipe}
+.is-active .grow{animation-name:grow}
+.is-active .flash{animation-name:flash;animation-duration:1.1s}
+
+@keyframes up{from{opacity:0;transform:translateY(46px)}to{opacity:1;transform:none}}
+@keyframes down{from{opacity:0;transform:translateY(-34px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
+@keyframes left{from{opacity:0;transform:translateX(-56px)}to{opacity:1;transform:none}}
+@keyframes right{from{opacity:0;transform:translateX(56px)}to{opacity:1;transform:none}}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes flash{0%{opacity:0;transform:scale(.9)}30%{opacity:1;transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
+
+/* ---------------- Peças de UI (mocks) ---------------- */
+
+.split{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:72px;align-items:center}
+.split.wide{grid-template-columns:minmax(0,380px) minmax(0,1fr)}
+
+.panel{
+  background:linear-gradient(170deg,var(--coal),#0a0a0d);
+  border:1px solid var(--line-soft);border-radius:20px;overflow:hidden;
+  box-shadow:0 40px 90px rgba(0,0,0,.6);
+}
+.panel-head{padding:20px 26px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;gap:16px}
+.panel-head h3{margin:0;font-size:1.22rem;font-weight:700}
+.panel-body{padding:26px}
+.panel-sub{color:var(--text-3);font-size:.95rem}
+
+.card{background:linear-gradient(170deg,var(--coal),#0a0a0d);border:1px solid var(--line-soft);border-radius:18px;padding:26px}
+.card.sel{border-color:var(--gold);background:linear-gradient(170deg,#1b1810,#0b0b0e)}
+
+.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:999px;font-size:.84rem;font-weight:600;border:1px solid var(--line);color:var(--text-2);background:var(--graphite)}
+.badge-gold{border-color:rgba(212,175,55,.5);color:var(--gold);background:var(--gold-dim)}
+.badge-ok{border-color:rgba(76,167,113,.5);color:#7fd0a1;background:rgba(76,167,113,.14)}
+.badge-danger{border-color:rgba(217,83,79,.5);color:#ef9b98;background:rgba(217,83,79,.14)}
+
+.price{font-family:var(--display);font-size:2.2rem;letter-spacing:.8px;color:var(--gold);font-weight:400}
+.strike{text-decoration:line-through;color:var(--text-3);font-family:var(--font);font-size:1.3rem;font-weight:600}
+
+.row{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.row-between{display:flex;gap:16px;align-items:center;justify-content:space-between}
+.stack{display:flex;flex-direction:column;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+
+/* serviço */
+.svc{display:flex;flex-direction:column;gap:10px}
+.svc h4{margin:0;font-size:1.22rem}
+.svc .muted{color:var(--text-3);font-size:.95rem;margin:0}
+
+/* pills de dia */
+.days{display:flex;gap:12px}
+.day{min-width:86px;padding:14px 10px;border-radius:14px;border:1px solid var(--line);background:var(--graphite);text-align:center;line-height:1.3}
+.day span{display:block;font-size:.76rem;letter-spacing:1.6px;text-transform:uppercase;color:var(--text-3)}
+.day strong{font-size:1.5rem}
+.day.sel{border-color:var(--gold);background:linear-gradient(160deg,#1b1810,#0b0b0e)}
+.day.sel span{color:var(--gold)}
+.day.promo strong::after{content:"•";color:var(--gold);margin-left:4px}
+
+/* slots */
+.slots{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.slot{padding:16px 6px;border-radius:12px;border:1px solid var(--line);background:var(--graphite);font-size:1.08rem;font-weight:700;text-align:center}
+.slot.off{opacity:.38;text-decoration:line-through;background:var(--black);color:var(--text-3)}
+.slot.sel{background:linear-gradient(145deg,var(--gold-soft),#b8942a);color:#16130a;border-color:transparent;box-shadow:0 10px 30px rgba(212,175,55,.3)}
+
+/* timeline da regra de 45 min */
+.rule-track{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:48px}
+.rule-slot{padding:26px 10px;border-radius:14px;border:1px dashed var(--line);background:rgba(255,255,255,.02);text-align:center;font-size:1.3rem;font-weight:700;color:var(--text-2)}
+.rule-block{
+  position:absolute;top:-30px;height:calc(100% + 60px);
+  width:var(--w);                       /* estático: a animação só percorre até aqui */
+  border-radius:16px;background:linear-gradient(135deg,rgba(212,175,55,.26),rgba(212,175,55,.1));
+  border:1px solid var(--gold);display:grid;place-items:center;
+  box-shadow:0 20px 50px rgba(212,175,55,.18);
+}
+.rule-block b{font-family:var(--display);font-size:1.9rem;letter-spacing:1.4px;color:var(--gold);font-weight:400}
+.is-active .rule-block{animation:block-in 1s cubic-bezier(.22,.84,.28,1) backwards;animation-delay:1.1s}
+@keyframes block-in{from{opacity:0;width:0}to{opacity:1;width:var(--w)}}
+.rule-legend{display:flex;justify-content:center;gap:14px;margin-top:62px}
+
+/* agendamentos do cliente */
+.appt{display:flex;align-items:center;gap:24px;padding:22px 26px;border:1px solid var(--line-soft);border-radius:16px;background:rgba(255,255,255,.015)}
+.appt .hour{font-family:var(--display);font-size:2.3rem;letter-spacing:1.2px;color:var(--gold);min-width:110px}
+.appt .who strong{display:block;font-size:1.22rem}
+.appt .who span{color:var(--text-3);font-size:.98rem}
+.appt .right-col{margin-left:auto;text-align:right}
+/* escopado em .is-active para reiniciar a cada passagem da cena */
+.is-active .appt.killing{animation:kill 1.2s cubic-bezier(.22,.84,.28,1) forwards;animation-delay:2.1s}
+@keyframes kill{0%{opacity:1}60%{opacity:.55}100%{opacity:.45;filter:saturate(.3)}}
+.is-active .appt.killing .who strong{animation:strike 1.2s forwards;animation-delay:2.1s}
+@keyframes strike{to{text-decoration:line-through;color:var(--text-3)}}
+
+/* vestuário */
+.prod{border-radius:18px;overflow:hidden;border:1px solid var(--line-soft);background:linear-gradient(170deg,var(--coal),#0a0a0d)}
+.prod .ph{height:190px;display:grid;place-items:center;background:linear-gradient(145deg,#211d14,#101014);color:var(--text-3);font-family:var(--display);font-size:2rem;letter-spacing:3px}
+.prod .info{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.prod h4{margin:0;font-size:1.08rem}
+.sizes{display:flex;gap:8px}
+.sz{padding:6px 13px;border-radius:9px;border:1px solid var(--line);background:var(--black);font-size:.9rem;font-weight:700}
+.sz.on{background:var(--gold);color:#16130a;border-color:transparent}
+
+.cart-pill{
+  position:absolute;right:110px;top:130px;z-index:20;
+  display:flex;align-items:center;gap:12px;padding:14px 22px;border-radius:999px;
+  background:var(--graphite-2);border:1px solid rgba(212,175,55,.45);font-weight:700;
+}
+.cart-pill b{display:grid;place-items:center;min-width:30px;height:30px;border-radius:999px;background:var(--gold);color:#16130a}
+.is-active .cart-pill{animation:pop .6s backwards;animation-delay:2.6s}
+.cart-pill.bump{animation:bump .5s ease}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.16)}100%{transform:scale(1)}}
+
+/* whatsapp */
+.wa{width:560px;border-radius:22px;border:1px solid var(--line);background:#0b141a;overflow:hidden;box-shadow:0 40px 90px rgba(0,0,0,.6)}
+.wa-head{display:flex;align-items:center;gap:14px;padding:18px 22px;background:#1f2c33}
+.wa-dot{width:38px;height:38px;border-radius:50%;background:var(--wa);display:grid;place-items:center;font-weight:700;color:#fff}
+.wa-head strong{font-size:1.05rem}
+.wa-head span{display:block;color:#8fa3ad;font-size:.82rem}
+.wa-body{padding:24px;min-height:330px;display:flex;flex-direction:column;justify-content:flex-end;gap:12px;
+  background-image:radial-gradient(rgba(255,255,255,.035) 1px,transparent 1px);background-size:22px 22px}
+.bubble{
+  align-self:flex-end;max-width:92%;padding:16px 18px;border-radius:14px 14px 4px 14px;
+  background:#005c4b;font-size:1rem;line-height:1.6;white-space:pre-wrap;
+}
+.bubble .meta{display:block;text-align:right;color:rgba(255,255,255,.55);font-size:.76rem;margin-top:6px}
+.caret{display:inline-block;width:2px;height:1.05em;background:#fff;vertical-align:-2px;animation:blink .9s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* painel */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.kpi{padding:26px;border-radius:18px;background:var(--coal);border:1px solid var(--line-soft)}
+.kpi span{font-size:.82rem;letter-spacing:2.2px;text-transform:uppercase;color:var(--text-3)}
+.kpi strong{display:block;margin-top:12px;font-family:var(--display);font-size:3.1rem;font-weight:400;letter-spacing:1px;color:var(--gold)}
+
+.tline{display:flex;align-items:center;gap:20px;padding:18px 24px;border-bottom:1px solid var(--line-soft)}
+.tline:last-child{border-bottom:none}
+.tline .h{font-family:var(--display);font-size:1.7rem;color:var(--gold);min-width:84px;letter-spacing:1px}
+.tline .n{flex:1}
+.tline .n strong{display:block;font-size:1.06rem}
+.tline .n span{color:var(--text-3);font-size:.92rem}
+
+/* promoções */
+.promo{padding:30px;border-radius:20px;border:1px dashed rgba(212,175,55,.45);background:var(--gold-dim)}
+.promo h4{margin:0 0 8px;font-size:1.5rem;color:var(--gold-soft)}
+.promo p{margin:0;color:var(--text-2);font-size:1.08rem;line-height:1.55}
+
+.calc{display:flex;align-items:baseline;gap:18px;margin-top:40px;justify-content:center}
+.calc .big{font-family:var(--display);font-size:5.4rem;color:var(--gold);letter-spacing:1.5px}
+
+/* fecho */
+.closing{align-items:center;text-align:center}
+.cta{display:inline-flex;align-items:center;gap:14px;padding:22px 42px;border-radius:999px;background:linear-gradient(145deg,var(--gold-soft),#b8942a);color:#16130a;font-size:1.3rem;font-weight:700}
+.sweep{position:absolute;inset:0;pointer-events:none;z-index:25}
+.is-active .sweep i{
+  position:absolute;top:-30%;left:-40%;width:28%;height:170%;transform:rotate(14deg);
+  background:linear-gradient(90deg,transparent,rgba(212,175,55,.22),transparent);
+  animation:sweep 1.5s ease-out backwards;animation-delay:.3s;
+}
+@keyframes sweep{from{left:-40%}to{left:130%}}
+
+/* ---------------- Controles ---------------- */
+
+.controls{
+  position:fixed;right:22px;bottom:22px;z-index:100;display:flex;gap:9px;
+  padding:9px;border-radius:14px;background:rgba(18,18,23,.9);border:1px solid var(--line);
+  backdrop-filter:blur(10px);opacity:.25;transition:opacity .25s;
+}
+.controls:hover,.controls:focus-within{opacity:1}
+.controls button{
+  width:42px;height:42px;border-radius:10px;cursor:pointer;
+  border:1px solid var(--line);background:var(--graphite);color:var(--text);
+  font-size:1rem;display:grid;place-items:center;
+}
+.controls button:hover{border-color:rgba(212,175,55,.6);color:var(--gold)}
+.hint{
+  position:fixed;left:22px;bottom:26px;z-index:100;color:#555;
+  font-size:.78rem;letter-spacing:1.4px;text-transform:uppercase;
+}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+</style></head>
+<body>
+
+<div class="viewport">
+<div class="stage" id="stage">
+
+  <div class="progress"><i id="bar"></i></div>
+
+  <div class="frame-top">
+    <div class="mark">L</div>
+    <div class="mark-text"><strong>Leo do Corte</strong><small>Barbearia</small></div>
+    <div class="chapter"><span id="chapter-name">Abertura</span><div class="dots" id="dots"></div></div>
+  </div>
+
+  <!-- 1 ─ Abertura -->
+  <section class="scene closing" id="s1">
+    <div class="sweep"><i></i></div>
+    <span class="eyebrow anim down">O sistema da sua barbearia</span>
+    <h1 class="title t-xl anim up" style="--d:.15s">LEO DO CORTE</h1>
+    <div class="anim grow" style="--d:.6s;height:3px;width:420px;margin:34px auto;background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
+    <p class="lead anim up" style="--d:.8s;max-width:46ch;font-size:1.9rem">
+      Agendamento online, loja de vestuário e painel do barbeiro.<br><b>Tudo em um só lugar.</b>
+    </p>
+  </section>
+
+  <!-- 2 ─ A dor -->
+  <section class="scene" id="s2">
+    <span class="eyebrow anim down">Hoje</span>
+    <h2 class="title t-lg anim up" style="--d:.1s;max-width:20ch">O corte é afiado.<br><span class="gold">A gestão, nem tanto.</span></h2>
+    <div class="grid3" style="margin-top:62px">
+      <div class="card anim up" style="--d:.5s">
+        <div class="price" style="font-size:2.6rem">01</div>
+        <h4 style="margin:12px 0 8px;font-size:1.35rem">Agenda no caderno</h4>
+        <p class="panel-sub" style="margin:0;font-size:1.02rem;line-height:1.6">Horário marcado duas vezes, cliente esperando em pé.</p>
+      </div>
+      <div class="card anim up" style="--d:.68s">
+        <div class="price" style="font-size:2.6rem">02</div>
+        <h4 style="margin:12px 0 8px;font-size:1.35rem">“Tem horário hoje?”</h4>
+        <p class="panel-sub" style="margin:0;font-size:1.02rem;line-height:1.6">O WhatsApp vira central de atendimento o dia inteiro.</p>
+      </div>
+      <div class="card anim up" style="--d:.86s">
+        <div class="price" style="font-size:2.6rem">03</div>
+        <h4 style="margin:12px 0 8px;font-size:1.35rem">Estoque no escuro</h4>
+        <p class="panel-sub" style="margin:0;font-size:1.02rem;line-height:1.6">Peça vendida que ninguém lembrou de dar baixa.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 ─ Agendamento -->
+  <section class="scene" id="s3">
+    <div class="split">
+      <div>
+        <span class="eyebrow anim left">Cliente</span>
+        <h2 class="title t-md anim left" style="--d:.1s">Agenda em<br>3 toques</h2>
+        <p class="lead anim left" style="--d:.28s;margin-top:28px">
+          Serviço, dia e horário. <b>Confirmação na hora</b>, sem troca de mensagem.
+        </p>
+        <div class="row anim left" style="--d:.46s;margin-top:34px">
+          <span class="badge badge-gold">10:00 › 19:00</span>
+          <span class="badge">Slots de 30 min</span>
+        </div>
+      </div>
+
+      <div class="panel anim right" style="--d:.3s">
+        <div class="panel-head"><h3>1. Serviço</h3><span class="panel-sub">3 opções</span></div>
+        <div class="panel-body">
+          <div class="grid3">
+            <div class="card svc anim pop" style="--d:.7s;padding:20px">
+              <h4>Corte</h4><p class="muted">30 min</p><div class="price">R$ 40,00</div>
+            </div>
+            <div class="card svc anim pop" style="--d:.84s;padding:20px">
+              <h4>+ Sobrancelha</h4><p class="muted">30 min</p><div class="price">R$ 45,00</div>
+            </div>
+            <div class="card svc sel anim pop" style="--d:.98s;padding:20px">
+              <h4>+ Barba</h4><p class="muted">45 min</p><div class="price">R$ 60,00</div>
+            </div>
+          </div>
+
+          <div style="margin-top:28px;--d:1.2s" class="anim fade">
+            <div class="row-between" style="margin-bottom:14px">
+              <strong style="font-size:1.1rem">2. Dia</strong>
+              <span class="panel-sub"><span class="gold">•</span> dia promocional</span>
+            </div>
+            <div class="days">
+              <div class="day anim pop" style="--d:1.3s"><span>Ter</span><strong>28</strong></div>
+              <div class="day promo anim pop" style="--d:1.4s"><span>Qua</span><strong>29</strong></div>
+              <div class="day sel anim pop" style="--d:1.5s"><span>Qui</span><strong>30</strong></div>
+              <div class="day anim pop" style="--d:1.6s"><span>Sex</span><strong>31</strong></div>
+              <div class="day anim pop" style="--d:1.7s"><span>Sáb</span><strong>01</strong></div>
+            </div>
+          </div>
+
+          <div style="margin-top:28px">
+            <strong style="font-size:1.1rem;display:block;margin-bottom:14px">3. Horário</strong>
+            <div class="slots">
+              <div class="slot anim pop" style="--d:2.0s">10:00</div>
+              <div class="slot off anim pop" style="--d:2.07s">10:30</div>
+              <div class="slot anim pop" style="--d:2.14s">11:00</div>
+              <div class="slot anim pop" style="--d:2.21s">11:30</div>
+              <div class="slot off anim pop" style="--d:2.28s">14:00</div>
+              <div class="slot anim pop" style="--d:2.35s">14:30</div>
+              <div class="slot anim pop" style="--d:2.42s">15:00</div>
+              <div class="slot anim pop" style="--d:2.49s">16:00</div>
+              <div class="slot anim pop" style="--d:2.56s">17:00</div>
+              <div class="slot anim pop" style="--d:2.63s">17:30</div>
+              <div class="slot sel anim flash" style="--d:2.85s">18:00</div>
+              <div class="slot off anim pop" style="--d:2.70s">18:30</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 ─ Regra dos 45 min -->
+  <section class="scene" id="s4">
+    <span class="eyebrow anim down">A regra que evita o prejuízo</span>
+    <h2 class="title t-lg anim up" style="--d:.1s;max-width:26ch">Serviço de 45 min<br><span class="gold">reserva dois slots.</span></h2>
+    <p class="lead anim up" style="--d:.3s;max-width:64ch;margin-top:24px;font-size:1.5rem">
+      Corte + Barba ocupa o horário escolhido <b>e o seguinte</b>. Ninguém marca por cima,
+      e 18:30 some da lista porque terminaria depois das 19h.
+    </p>
+
+    <div class="rule-track">
+      <div class="rule-slot anim pop" style="--d:.5s">17:00</div>
+      <div class="rule-slot anim pop" style="--d:.6s">17:30</div>
+      <div class="rule-slot anim pop" style="--d:.7s">18:00</div>
+      <div class="rule-slot anim pop" style="--d:.8s">18:30</div>
+      <div class="rule-block" style="--w:calc(50% - 7px);left:calc(50% + 7px)"><b>CORTE + BARBA · 45 MIN</b></div>
+    </div>
+
+    <div class="rule-legend">
+      <span class="badge badge-danger anim pop" style="--d:2.4s;font-size:1.05rem">18:30 deixa de aparecer para serviços de 45 min</span>
+      <span class="badge badge-ok anim pop" style="--d:2.55s;font-size:1.05rem">nenhuma sobreposição possível</span>
+    </div>
+  </section>
+
+  <!-- 5 ─ Meus agendamentos -->
+  <section class="scene" id="s5">
+    <div class="split wide">
+      <div>
+        <span class="eyebrow anim left">Meus agendamentos</span>
+        <h2 class="title t-md anim left" style="--d:.1s">Cancelou?<br>O horário<br><span class="gold">volta pra fila.</span></h2>
+        <p class="lead anim left" style="--d:.3s;margin-top:28px">
+          O cliente cancela sozinho e a <b>vaga reabre na hora</b> para outro agendar.
+        </p>
+      </div>
+      <div class="stack">
+        <div class="appt anim right" style="--d:.4s">
+          <div class="hour">14:30</div>
+          <div class="who"><strong>Corte + Sobrancelha</strong><span>quinta-feira, 30 de outubro</span></div>
+          <div class="right-col"><div class="price">R$ 45,00</div><span class="badge badge-ok" style="margin-top:8px">Confirmado</span></div>
+        </div>
+        <div class="appt anim right killing" style="--d:.55s">
+          <div class="hour">18:00</div>
+          <div class="who"><strong>Corte + Barba</strong><span>sexta-feira, 31 de outubro</span></div>
+          <div class="right-col"><div class="price">R$ 60,00</div><span class="badge badge-danger" style="margin-top:8px">Cancelado</span></div>
+        </div>
+        <div class="appt anim right" style="--d:.7s">
+          <div class="hour">11:00</div>
+          <div class="who"><strong>Corte</strong><span>sábado, 01 de novembro</span></div>
+          <div class="right-col"><div class="price">R$ 40,00</div><span class="badge badge-ok" style="margin-top:8px">Confirmado</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 ─ Vestuário + WhatsApp -->
+  <section class="scene" id="s6">
+    <div class="cart-pill" id="cart-pill">Carrinho <b id="cart-n">1</b></div>
+    <div class="split wide">
+      <div>
+        <span class="eyebrow anim left">Vestuário</span>
+        <h2 class="title t-md anim left" style="--d:.1s">A loja<br>dentro do<br><span class="gold">agendamento.</span></h2>
+        <p class="lead anim left" style="--d:.3s;margin-top:28px">
+          Sem pagamento online: o pedido chega no seu WhatsApp <b>já formatado</b>,
+          com tamanhos, totais e promoções.
+        </p>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center">
+        <div class="stack">
+          <div class="prod anim pop" style="--d:.45s">
+            <div class="ph">LEO</div>
+            <div class="info">
+              <h4>Camiseta Oversized Preta</h4>
+              <div class="sizes"><span class="sz">P</span><span class="sz on">M</span><span class="sz">G</span><span class="sz">GG</span></div>
+              <div class="row-between"><span class="price" style="font-size:1.7rem">R$ 89,90</span><span class="badge badge-ok">Em estoque</span></div>
+            </div>
+          </div>
+          <div class="prod anim pop" style="--d:.62s">
+            <div class="ph">LEO</div>
+            <div class="info">
+              <h4>Boné Aba Curva Dourado</h4>
+              <div class="sizes"><span class="sz on">Único</span></div>
+              <div class="row-between"><span class="price" style="font-size:1.7rem">R$ 69,90</span><span class="badge badge-ok">Em estoque</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wa anim right" style="--d:1.1s">
+          <div class="wa-head">
+            <div class="wa-dot">L</div>
+            <div><strong>Leo do Corte</strong><span>online</span></div>
+          </div>
+          <div class="wa-body">
+            <div class="bubble"><span id="wa-text"></span><span class="caret" id="wa-caret"></span><span class="meta">agora ✓✓</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 ─ Painel do barbeiro -->
+  <section class="scene" id="s7">
+    <span class="eyebrow anim down">Painel do barbeiro</span>
+    <h2 class="title t-lg anim up" style="--d:.1s">O dia inteiro<br><span class="gold">numa tela só.</span></h2>
+
+    <div class="kpis" style="margin-top:48px">
+      <div class="kpi anim up" style="--d:.4s"><span>Hoje</span><strong data-count="6">0</strong></div>
+      <div class="kpi anim up" style="--d:.52s"><span>Receita do dia</span><strong data-count="285" data-money="1">R$ 0,00</strong></div>
+      <div class="kpi anim up" style="--d:.64s"><span>Futuros</span><strong data-count="14">0</strong></div>
+      <div class="kpi anim up" style="--d:.76s"><span>Clientes</span><strong data-count="38">0</strong></div>
+    </div>
+
+    <div class="panel anim up" style="--d:.95s;margin-top:34px">
+      <div class="panel-head"><h3>Agenda · quinta-feira, 30 de outubro</h3><span class="panel-sub">Dia · Semana</span></div>
+      <div>
+        <div class="tline anim left" style="--d:1.15s">
+          <div class="h">10:00</div>
+          <div class="n"><strong>Rafael Nunes</strong><span>Corte · até 10:30 · R$ 40,00</span></div>
+          <span class="badge badge-ok">Confirmado</span><span class="badge">Remarcar</span>
+        </div>
+        <div class="tline anim left" style="--d:1.3s">
+          <div class="h">14:30</div>
+          <div class="n"><strong>Diego Alves</strong><span>Corte + Sobrancelha · até 15:00 · R$ 45,00</span></div>
+          <span class="badge badge-ok">Confirmado</span><span class="badge">Remarcar</span>
+        </div>
+        <div class="tline anim left" style="--d:1.45s">
+          <div class="h">18:00</div>
+          <div class="n"><strong>Marcos Lima</strong><span>Corte + Barba · até 18:45 · <span class="gold">R$ 54,00 (−R$ 6,00)</span></span></div>
+          <span class="badge badge-gold">Promoção</span><span class="badge">Remarcar</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 ─ Promoções -->
+  <section class="scene" id="s8">
+    <span class="eyebrow anim down">Motor de descontos</span>
+    <h2 class="title t-lg anim up" style="--d:.1s;max-width:24ch">Você cria a regra.<br><span class="gold">O sistema aplica.</span></h2>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:52px">
+      <div class="promo anim left" style="--d:.45s">
+        <h4>Quarta do Corte</h4>
+        <p>Toda quarta-feira, <b class="gold">10%</b> de desconto nos serviços.</p>
+      </div>
+      <div class="promo anim right" style="--d:.6s">
+        <h4>Corte + Peça</h4>
+        <p>1 serviço + 1 peça de vestuário, <b class="gold">5%</b> no valor total.</p>
+      </div>
+    </div>
+
+    <div class="calc">
+      <span class="strike anim fade" style="--d:1.2s">R$ 40,00</span>
+      <span class="gold anim fade" style="--d:1.3s;font-size:2rem">›</span>
+      <span class="big anim pop" id="promo-price" style="--d:1.45s">R$ 36,00</span>
+      <span class="badge badge-gold anim pop" style="--d:1.7s;font-size:1rem">aplicado automaticamente</span>
+    </div>
+  </section>
+
+  <!-- 9 ─ Fecho -->
+  <section class="scene closing" id="s9">
+    <div class="sweep"><i></i></div>
+    <div class="mark anim pop" style="--d:.1s;width:92px;height:92px;font-size:3.4rem;border-radius:24px;margin:0 auto 28px">L</div>
+    <h2 class="title t-xl anim up" style="--d:.25s;font-size:8rem">LEO DO CORTE</h2>
+    <p class="lead anim up" style="--d:.5s;max-width:48ch;font-size:1.8rem;margin-top:18px">
+      Agenda cheia, estoque no controle<br>e o cliente marcando sozinho.
+    </p>
+    <div class="anim pop" style="--d:.85s;margin-top:46px">
+      <span class="cta">Pronto para usar</span>
+    </div>
+  </section>
+
+  <div class="vignette"></div>
+</div>
+</div>
+
+<div class="controls">
+  <button id="btn-play" title="Pausar / continuar (espaço)" aria-label="Pausar ou continuar">⏸</button>
+  <button id="btn-prev" title="Cena anterior (←)" aria-label="Cena anterior">⏮</button>
+  <button id="btn-next" title="Próxima cena (→)" aria-label="Próxima cena">⏭</button>
+  <button id="btn-full" title="Tela cheia (F)" aria-label="Tela cheia">⛶</button>
+</div>
+<p class="hint">espaço pausa · ← → navega · F tela cheia</p>
+
+<script>
+(function () {
+  'use strict';
+
+  var SCENES = [
+    { id: 's1', ms: 4600, name: 'Abertura' },
+    { id: 's2', ms: 5400, name: 'O problema' },
+    { id: 's3', ms: 9200, name: 'Agendamento' },
+    { id: 's4', ms: 6600, name: 'Regra 45 min' },
+    { id: 's5', ms: 5600, name: 'Cancelamento' },
+    { id: 's6', ms: 9400, name: 'Vestuário' },
+    { id: 's7', ms: 8200, name: 'Painel' },
+    { id: 's8', ms: 6200, name: 'Promoções' },
+    { id: 's9', ms: 5200, name: 'Fecho' }
+  ];
+
+  var TOTAL = SCENES.reduce(function (sum, s) { return sum + s.ms; }, 0);
+
+  var stage = document.getElementById('stage');
+  var bar = document.getElementById('bar');
+  var dots = document.getElementById('dots');
+  var chapterName = document.getElementById('chapter-name');
+
+  var index = 0;
+  var elapsed = 0;
+  var last = 0;
+  var paused = false;
+  var run = 0;          // invalida timers de cenas antigas
+
+  /* ---------------- Escala do palco ---------------- */
+
+  function fit() {
+    var scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = 'scale(' + scale + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* ---------------- Marcadores ---------------- */
+
+  SCENES.forEach(function () {
+    dots.appendChild(document.createElement('b'));
+  });
+
+  function paintDots() {
+    Array.prototype.forEach.call(dots.children, function (dot, i) {
+      if (i === index) dot.classList.add('on'); else dot.classList.remove('on');
+    });
+    chapterName.textContent = SCENES[index].name;
+  }
+
+  /* ---------------- Efeitos por cena ---------------- */
+
+  var WA_MESSAGE =
+    '*Pedido — Leo do Corte*\n\n' +
+    'Cliente: Marcos Lima\n\n' +
+    '*Itens*\n' +
+    '• 1x Camiseta Oversized Preta (tam. M) — R$ 89,90\n' +
+    '• 1x Boné Aba Curva Dourado (tam. Único) — R$ 69,90\n\n' +
+    'Subtotal: R$ 159,80\n' +
+    '*Corte + Peça (5%): -R$ 7,99*\n' +
+    '*Total: R$ 151,81*\n\n' +
+    'Podemos combinar a retirada?';
+
+  function typeInto(el, text, speed, token) {
+    el.textContent = '';
+    var i = 0;
+    (function step() {
+      if (token !== run) return;
+      i += 2;
+      el.textContent = text.slice(0, i);
+      if (i < text.length) window.setTimeout(step, speed);
+    })();
+  }
+
+  function countTo(el, target, ms, money, token) {
+    var start = performance.now();
+    function frame(now) {
+      if (token !== run) return;
+      var p = Math.min(1, (now - start) / ms);
+      var eased = 1 - Math.pow(1 - p, 3);
+      var value = target * eased;
+      el.textContent = money
+        ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        : Math.round(value);
+      if (p < 1) window.requestAnimationFrame(frame);
+    }
+    window.requestAnimationFrame(frame);
+  }
+
+  var HOOKS = {
+    s6: function (scene, token) {
+      var caret = document.getElementById('wa-caret');
+      var pill = document.getElementById('cart-pill');
+      var num = document.getElementById('cart-n');
+
+      num.textContent = '1';
+      caret.hidden = false;
+
+      window.setTimeout(function () {
+        if (token !== run) return;
+        num.textContent = '2';
+        pill.classList.add('bump');
+        window.setTimeout(function () { pill.classList.remove('bump'); }, 520);
+      }, 3200);
+
+      window.setTimeout(function () {
+        if (token !== run) return;
+        typeInto(document.getElementById('wa-text'), WA_MESSAGE, 16, token);
+        window.setTimeout(function () {
+          if (token !== run) return;
+          caret.hidden = true;
+        }, 3600);
+      }, 2000);
+    },
+
+    s7: function (scene, token) {
+      Array.prototype.forEach.call(scene.querySelectorAll('[data-count]'), function (el) {
+        var target = parseFloat(el.getAttribute('data-count'));
+        var money = el.getAttribute('data-money') === '1';
+        window.setTimeout(function () {
+          countTo(el, target, 1300, money, token);
+        }, 420);
+      });
+    }
+  };
+
+  /* ---------------- Troca de cena ---------------- */
+
+  function activate(i) {
+    run += 1;
+    var token = run;
+    index = i;
+
+    SCENES.forEach(function (s, n) {
+      var el = document.getElementById(s.id);
+      if (n === i) el.classList.add('is-active');
+      else el.classList.remove('is-active');
+    });
+
+    paintDots();
+
+    var hook = HOOKS[SCENES[i].id];
+    if (hook) hook(document.getElementById(SCENES[i].id), token);
+  }
+
+  function goTo(i) {
+    elapsed = 0;
+    activate((i + SCENES.length) % SCENES.length);
+  }
+
+  /* ---------------- Loop ---------------- */
+
+  function tick(now) {
+    if (!last) last = now;
+    var delta = now - last;
+    last = now;
+
+    if (!paused) {
+      elapsed += delta;
+      if (elapsed >= SCENES[index].ms) goTo(index + 1);
+    }
+
+    var before = 0;
+    for (var i = 0; i < index; i++) before += SCENES[i].ms;
+    bar.style.width = ((before + Math.min(elapsed, SCENES[index].ms)) / TOTAL * 100) + '%';
+
+    window.requestAnimationFrame(tick);
+  }
+
+  /* ---------------- Controles ---------------- */
+
+  var playBtn = document.getElementById('btn-play');
+
+  function togglePlay() {
+    paused = !paused;
+    playBtn.textContent = paused ? '▶' : '⏸';
+  }
+
+  playBtn.addEventListener('click', togglePlay);
+  document.getElementById('btn-prev').addEventListener('click', function () { goTo(index - 1); });
+  document.getElementById('btn-next').addEventListener('click', function () { goTo(index + 1); });
+  document.getElementById('btn-full').addEventListener('click', function () {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === ' ') { event.preventDefault(); togglePlay(); }
+    else if (event.key === 'ArrowRight') goTo(index + 1);
+    else if (event.key === 'ArrowLeft') goTo(index - 1);
+    else if (event.key === 'f' || event.key === 'F') document.getElementById('btn-full').click();
+  });
+
+  /* ---------------- Início ---------------- */
+
+  activate(0);
+  window.requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leo do Corte — Barbearia</title>
+<meta name="description" content="Barbearia Leo do Corte: agendamento online, vestuário e atendimento de primeira.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c0c0f'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='17' font-weight='bold' text-anchor='middle' fill='%23d4af37'%3EL%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#/home" data-nav>
+      <span class="brand-mark">L</span>
+      <span class="brand-text">
+        <strong>Leo do Corte</strong>
+        <small>Barbearia</small>
+      </span>
+    </a>
+
+    <nav class="nav" id="nav-desktop" aria-label="Navegação principal"></nav>
+
+    <div class="topbar-actions">
+      <a class="cart-btn" href="#/vestuario" data-nav aria-label="Abrir carrinho">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/><path d="M6 6 5 2H2"/></svg>
+        <span class="cart-count" id="cart-count" hidden>0</span>
+      </a>
+      <div id="user-slot" class="user-slot"></div>
+      <button class="burger" id="burger" aria-label="Abrir menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+  <nav class="nav-mobile" id="nav-mobile" aria-label="Navegação móvel" hidden></nav>
+</header>
+
+<main id="view" class="view" tabindex="-1"></main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <strong class="footer-brand">Leo do Corte</strong>
+      <p class="muted">Corte, barba e estilo. Atendimento de segunda a sábado, das 10h às 19h.</p>
+    </div>
+    <div class="footer-links">
+      <a href="#/home" data-nav>Home</a>
+      <a href="#/agendamento" data-nav>Agendamento</a>
+      <a href="#/vestuario" data-nav>Vestuário</a>
+      <a href="#/meus-agendamentos" data-nav>Meus agendamentos</a>
+    </div>
+  </div>
+  <p class="copyright">© <span id="year"></span> Leo do Corte · Dados salvos neste navegador</p>
+</footer>
+
+<div class="modal-backdrop" id="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="assets/js/store.js"></script>
+<script src="assets/js/discounts.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/booking.js"></script>
+<script src="assets/js/shop.js"></script>
+<script src="assets/js/my-bookings.js"></script>
+<script src="assets/js/admin.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

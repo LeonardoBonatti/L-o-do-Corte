@@ -1,0 +1,21 @@
+# Dependências
+node_modules/
+
+# Builds
+dist/
+
+# Repositório git do scaffold do Remotion, desativado para unificar o projeto
+.git.disabled/
+
+# Ambiente
+.env
+.env.local
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/

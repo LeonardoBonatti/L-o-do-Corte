@@ -1,0 +1,9 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# Ignora o conteúdo de out/, menos o vídeo final da apresentação —
+# ele é material de demonstração e vai versionado de propósito.
+out/*
+!out/LeoDoCorte.mp4
