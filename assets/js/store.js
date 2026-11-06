@@ -126,12 +126,12 @@ window.App = window.App || {};
 
   function seed() {
     return {
-      version: 1,
+      version: 2,
       sessionUserId: null,
       settings: {
-        shopName: 'Leo do Corte',
-        whatsapp: '5511999999999',
-        address: 'Rua das Tesouras, 120 — Centro',
+        shopName: 'Léo do Corte',
+        whatsapp: '5519999287339',
+        address: 'R. Olívio Saciloto, 25 - Jardim Brasil, Americana - SP, 13474-111',
         openTime: '10:00',
         closeTime: '19:00',
         slotMinutes: SLOT,
@@ -139,8 +139,8 @@ window.App = window.App || {};
       },
       users: [
         {
-          id: 'u_admin', name: 'Leo', email: 'leo@leodocorte.com',
-          phone: '11999999999', password: 'leo123', role: 'admin',
+          id: 'u_admin', name: 'Léo', email: 'leo@leodocorte.com',
+          phone: '19999287339', password: 'leo123', role: 'admin',
           createdAt: new Date().toISOString()
         }
       ],
@@ -235,6 +235,23 @@ window.App = window.App || {};
       if (!Array.isArray(data[k])) data[k] = base[k];
     });
     data.settings = Object.assign({}, base.settings, data.settings || {});
+
+    /* A v1 trazia contato de exemplo ("Rua das Tesouras", telefone 5511…).
+       A v2 traz os dados reais da barbearia, então eles substituem o que
+       estava gravado — senão quem já abriu a app continuaria vendo o
+       endereço falso, porque os dados salvos têm precedência no merge. */
+    if (!data.version || data.version < 2) {
+      data.settings.shopName = base.settings.shopName;
+      data.settings.whatsapp = base.settings.whatsapp;
+      data.settings.address = base.settings.address;
+      data.users.forEach(function (u) {
+        if (u.id === 'u_admin') {
+          u.name = base.users[0].name;
+          u.phone = base.users[0].phone;
+        }
+      });
+    }
+
     if (!data.users.length) data.users = base.users;
     if (!data.services.length) data.services = base.services;
     data.version = base.version;

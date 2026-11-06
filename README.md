@@ -1,7 +1,11 @@
-# Leo do Corte — aplicação web da barbearia
+# Léo do Corte — aplicação web da barbearia
 
 Aplicação web responsiva com autenticação, agendamento, catálogo de vestuário
 com carrinho integrado ao WhatsApp e painel administrativo do barbeiro.
+
+**Barbearia.** R. Olívio Saciloto, 25 — Jardim Brasil, Americana/SP, 13474-111 ·
+(19) 99928-7339. Os dados ficam em *Ajustes* no painel do barbeiro e podem ser
+trocados sem mexer no código.
 
 **Sem build, sem dependências, sem servidor.** HTML + CSS + JavaScript clássico.
 Basta abrir `index.html` no navegador (duplo clique funciona).
@@ -27,6 +31,11 @@ npx --yes serve .
 
 > São credenciais de demonstração, gravadas em texto puro no seed. Em produção,
 > troque por um backend com hash de senha.
+>
+> **O acesso do barbeiro não aparece mais na tela de login** — ela é a área do
+> cliente. Entre com o e-mail acima para cair no painel. Como não há backend,
+> essa senha não protege nada: ela só destrava o painel sobre os dados que já
+> estão no `localStorage` de quem abriu a página.
 
 ---
 
@@ -99,6 +108,19 @@ Não há pagamento online: **Finalizar pedido no WhatsApp** abre o
 `wa.me` do barbeiro com o resumo já formatado (itens, tamanhos, quantidades,
 promoções, total e o próximo horário marcado do cliente, se houver). O pedido
 fica registrado na aba *Pedidos* do painel.
+
+### Contato e localização
+
+Em todas as páginas há um **botão flutuante de WhatsApp** que abre a conversa
+com o barbeiro já com uma mensagem pronta ("Vim pelo site…"). Ele não aparece
+quando o próprio barbeiro está logado.
+
+O rodapé e o bloco *Onde estamos* da home mostram o endereço e o telefone, e
+tanto o endereço quanto o botão **Obter rota** abrem a rota no Google Maps —
+`maps/dir/?api=1&destination=<endereço>`, que no celular cai no app de mapas.
+
+Tudo sai de *Ajustes*: trocar o endereço ou o WhatsApp no painel muda os links
+na hora, sem tocar no código.
 
 ### Painel do barbeiro
 

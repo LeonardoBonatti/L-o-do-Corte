@@ -16,6 +16,7 @@ dist/
 Thumbs.db
 desktop.ini
 
-# Editores
+# Editores e ferramentas locais
 .vscode/
 .idea/
+.claude/

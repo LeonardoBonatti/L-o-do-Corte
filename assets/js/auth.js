@@ -120,10 +120,6 @@
           '<p class="auth-switch">Ainda não tem conta? ' +
             '<button class="linkish" type="button" data-action="auth-mode" data-mode="cadastro">Criar conta</button>' +
           '</p>' +
-          '<div class="demo-box">' +
-            '<strong>Acesso do barbeiro (demonstração)</strong><br>' +
-            'E-mail: <code>leo@leodocorte.com</code> · Senha: <code>leo123</code>' +
-          '</div>' +
         '</form>' +
       '</div>';
   }

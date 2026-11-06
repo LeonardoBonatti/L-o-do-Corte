@@ -61,7 +61,7 @@
       app.pendingRedirect = '#/meus-agendamentos';
     }
 
-    document.title = 'Leo do Corte — ' + entry.title;
+    document.title = 'Léo do Corte — ' + entry.title;
     document.getElementById('view').innerHTML = entry.render(route.params);
     renderChrome();
     closeMobileNav();
@@ -102,6 +102,73 @@
           (user.role === 'admin' ? '<span class="role-tag">admin</span>' : '') +
         '</button>'
       : '<a class="btn btn-primary btn-sm" href="#/entrar" data-nav>Entrar</a>';
+
+    renderContact();
+  }
+
+  /* ---------------- Contato: WhatsApp e rota ---------------- */
+
+  /** Link do WhatsApp do barbeiro, com mensagem opcional já preenchida. */
+  function waHref(text) {
+    var phone = utils.digitsOnly(store.get().settings.whatsapp);
+    if (phone.length <= 11) phone = '55' + phone;   // sem DDI gravado
+    return 'https://wa.me/' + phone + (text ? '?text=' + encodeURIComponent(text) : '');
+  }
+
+  /**
+   * Rota até a barbearia, no app de mapas do aparelho (ou no Maps no desktop).
+   * O `&` já vem como `&amp;` porque o retorno é usado em atributo HTML.
+   */
+  function mapsHref(address) {
+    return 'https://www.google.com/maps/dir/?api=1&amp;destination=' +
+      encodeURIComponent(address || '');
+  }
+
+  /** Telefone legível: tira o DDI 55 antes de formatar. */
+  function phoneLabel(raw) {
+    var d = utils.digitsOnly(raw);
+    if (d.indexOf('55') === 0 && d.length > 11) d = d.slice(2);
+    return utils.formatPhone(d);
+  }
+
+  var WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path d="M12 3C7 3 3 6.6 3 11c0 2.1.9 4 2.5 5.4L4.7 21l4.6-1.4c.9.2 1.8.3 2.7.3 5 0 9-3.6 9-8s-4-8-9-8z"/>' +
+    '</svg>';
+
+  /** Botão flutuante de WhatsApp e bloco de contato no rodapé, em toda página. */
+  function renderContact() {
+    var s = store.get().settings;
+    var greeting = 'Olá! Vim pelo site da ' + (s.shopName || 'barbearia') +
+      ' e gostaria de falar sobre um horário.';
+
+    var fab = document.getElementById('wa-fab');
+    if (auth.isAdmin()) {
+      // O barbeiro não precisa chamar a si mesmo.
+      if (fab && fab.parentNode) fab.parentNode.removeChild(fab);
+    } else {
+      if (!fab) {
+        fab = document.createElement('a');
+        fab.id = 'wa-fab';
+        fab.className = 'wa-fab';
+        fab.target = '_blank';
+        fab.rel = 'noopener';
+        document.body.appendChild(fab);
+      }
+      fab.href = waHref(greeting);
+      fab.setAttribute('aria-label', 'Chamar a barbearia no WhatsApp');
+      fab.innerHTML = WA_ICON + '<span>WhatsApp</span>';
+    }
+
+    var box = document.getElementById('footer-contact');
+    if (!box) return;
+    box.innerHTML =
+      (s.address
+        ? '<a href="' + mapsHref(s.address) + '" target="_blank" rel="noopener">' +
+            esc(s.address) + '</a>' +
+          '<a href="' + mapsHref(s.address) + '" target="_blank" rel="noopener">Obter rota</a>'
+        : '') +
+      '<a href="' + waHref(greeting) + '" target="_blank" rel="noopener">' +
+        esc(phoneLabel(s.whatsapp)) + ' · WhatsApp</a>';
   }
 
   /* ---------------- Home ---------------- */
@@ -207,12 +274,19 @@
           '<div class="row-between">' +
             '<div>' +
               '<span class="eyebrow">Onde estamos</span>' +
-              '<h3 style="font-size:1.15rem">' + esc(state.settings.address || 'Barbearia Leo do Corte') + '</h3>' +
+              '<h3 style="font-size:1.15rem">' + esc(state.settings.shopName || 'Léo do Corte') + '</h3>' +
+              '<p class="muted" style="margin:6px 0 0">' + esc(state.settings.address || '') + '</p>' +
               '<p class="muted" style="margin:6px 0 0">Atendimento das ' + esc(state.settings.openTime) +
-                ' às ' + esc(state.settings.closeTime) + ', de segunda a sábado.</p>' +
+                ' às ' + esc(state.settings.closeTime) + ', de segunda a sábado · ' +
+                esc(phoneLabel(state.settings.whatsapp)) + '</p>' +
             '</div>' +
-            '<a class="btn btn-wa" target="_blank" rel="noopener" ' +
-              'href="https://wa.me/' + utils.digitsOnly(state.settings.whatsapp) + '">Falar no WhatsApp</a>' +
+            '<div class="stack">' +
+              '<a class="btn btn-wa" target="_blank" rel="noopener" href="' +
+                waHref('Olá! Vim pelo site e gostaria de falar sobre um horário.') +
+                '">Falar no WhatsApp</a>' +
+              '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' +
+                mapsHref(state.settings.address) + '">Obter rota</a>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</section>';

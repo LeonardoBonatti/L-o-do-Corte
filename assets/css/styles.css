@@ -546,12 +546,6 @@ td .row{gap:6px}
 
 .auth-wrap{max-width:430px;margin:28px auto}
 .auth-switch{margin-top:16px;text-align:center;font-size:.86rem;color:var(--text-3)}
-.demo-box{
-  margin-top:16px;padding:12px 14px;border-radius:var(--radius-sm);
-  background:var(--graphite);border:1px solid var(--line);
-  font-size:.79rem;color:var(--text-3);line-height:1.7;
-}
-.demo-box code{color:var(--gold-soft);font-size:.78rem}
 
 /* ---------------- Modal ---------------- */
 
@@ -609,6 +603,24 @@ td .row{gap:6px}
   max-width:var(--max);margin:24px auto 0;padding-top:16px;
   border-top:1px solid var(--line-soft);
   font-size:.75rem;color:var(--text-3);text-align:center;
+}
+
+/* ---------------- WhatsApp flutuante ---------------- */
+
+.wa-fab{
+  position:fixed;right:20px;bottom:20px;z-index:60;
+  display:inline-flex;align-items:center;gap:9px;
+  padding:12px 18px;border-radius:999px;
+  background:#1fa855;color:#fff;font-size:.88rem;font-weight:600;
+  box-shadow:0 10px 26px rgba(0,0,0,.4);
+  transition:transform .16s ease, box-shadow .16s ease;
+}
+.wa-fab:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,0,0,.5);color:#fff}
+.wa-fab svg{width:21px;height:21px;fill:currentColor;flex:none}
+
+@media (max-width:620px){
+  .wa-fab{right:14px;bottom:14px;padding:13px;border-radius:50%}
+  .wa-fab span{display:none}
 }
 
 /* ---------------- Responsive ---------------- */
