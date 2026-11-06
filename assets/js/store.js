@@ -1,6 +1,14 @@
 /* ============================================================
-   store.js — persistência (localStorage), seed e utilitários
+   store.js — cliente da API, cache em memória e utilitários
    Expõe: window.App.{store, utils}
+
+   O estado vem de uma única chamada a GET /api/bootstrap e fica em memória.
+   É isso que permite manter as leituras síncronas espalhadas pela app
+   (store.get(), serviceById(), slotAvailability()…) sem reescrever todo o
+   código de renderização: só as escritas são assíncronas.
+
+   O carrinho continua no localStorage de propósito — é rascunho por
+   navegador, não dado compartilhado.
    ============================================================ */
 
 window.App = window.App || {};
@@ -8,7 +16,7 @@ window.App = window.App || {};
 (function () {
   'use strict';
 
-  var KEY = 'leodocorte.v1';
+  var KEY = 'leodocorte.v1';     // usado só pelas chaves do carrinho
   var SLOT = 30;                 // minutos por slot
   var OPEN = 10 * 60;            // 10:00
   var CLOSE = 19 * 60;           // 19:00 (fechamento — nenhum atendimento passa daqui)
@@ -122,160 +130,89 @@ window.App = window.App || {};
     return out;
   }
 
-  /* ---------------- Seed ---------------- */
+  /* ---------------- Cliente da API ---------------- */
 
-  function seed() {
-    return {
-      version: 2,
-      sessionUserId: null,
-      settings: {
-        shopName: 'Léo do Corte',
-        whatsapp: '5519999287339',
-        address: 'R. Olívio Saciloto, 25 - Jardim Brasil, Americana - SP, 13474-111',
-        openTime: '10:00',
-        closeTime: '19:00',
-        slotMinutes: SLOT,
-        closedWeekdays: [0]           // domingo fechado
-      },
-      users: [
-        {
-          id: 'u_admin', name: 'Léo', email: 'leo@leodocorte.com',
-          phone: '19999287339', password: 'leo123', role: 'admin',
-          createdAt: new Date().toISOString()
-        }
-      ],
-      services: [
-        { id: 'svc_corte', name: 'Corte', price: 40, duration: 30, desc: 'Máquina, tesoura e finalização.' },
-        { id: 'svc_corte_sobr', name: 'Corte + Sobrancelha', price: 45, duration: 30, desc: 'Corte completo com design de sobrancelha.' },
-        { id: 'svc_corte_barba', name: 'Corte + Barba', price: 60, duration: 45, desc: 'Corte, barba na navalha e toalha quente.' }
-      ],
-      products: [
-        {
-          id: 'p_1', title: 'Camiseta Oversized Preta', price: 89.9, active: true,
-          image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=800&q=70',
-          desc: 'Algodão pesado, caimento oversized.',
-          sizes: [{ size: 'P', qty: 4 }, { size: 'M', qty: 6 }, { size: 'G', qty: 5 }, { size: 'GG', qty: 2 }]
-        },
-        {
-          id: 'p_2', title: 'Camisa Social Chumbo', price: 139.9, active: true,
-          image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=800&q=70',
-          desc: 'Tecido acetinado, manga longa.',
-          sizes: [{ size: 'M', qty: 3 }, { size: 'G', qty: 3 }, { size: 'GG', qty: 1 }]
-        },
-        {
-          id: 'p_3', title: 'Short Sarja Masculino', price: 99.9, active: true,
-          image: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?auto=format&fit=crop&w=800&q=70',
-          desc: 'Sarja com elastano, bolso traseiro.',
-          sizes: [{ size: '38', qty: 2 }, { size: '40', qty: 4 }, { size: '42', qty: 4 }, { size: '44', qty: 0 }]
-        },
-        {
-          id: 'p_4', title: 'Boné Aba Curva Dourado', price: 69.9, active: true,
-          image: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=800&q=70',
-          desc: 'Bordado Léo do Corte em fio dourado.',
-          sizes: [{ size: 'Único', qty: 9 }]
-        },
-        {
-          id: 'p_5', title: 'Moletom Capuz Grafite', price: 179.9, active: true,
-          image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=800&q=70',
-          desc: 'Moletom flanelado, bolso canguru.',
-          sizes: [{ size: 'M', qty: 2 }, { size: 'G', qty: 3 }, { size: 'GG', qty: 2 }]
-        },
-        {
-          id: 'p_6', title: 'Pomada Modeladora Matte', price: 49.9, active: true,
-          image: 'https://images.unsplash.com/photo-1626808642875-0aa545482dfb?auto=format&fit=crop&w=800&q=70',
-          desc: 'Fixação forte, efeito seco. 120g.',
-          sizes: [{ size: '120g', qty: 12 }]
-        }
-      ],
-      appointments: [],
-      orders: [],
-      /* Promoções por dia da semana */
-      weekdayRules: [
-        {
-          id: 'wd_1', label: 'Quarta do Corte', weekday: 3, percent: 10,
-          scope: 'servicos', serviceId: null, active: true
-        }
-      ],
-      /* Promoções combo (cross-selling serviço + vestuário) */
-      comboRules: [
-        {
-          id: 'cb_1', label: 'Corte + Peça de Vestuário', minServices: 1, minProducts: 1,
-          percent: 5, active: true
-        }
-      ]
-    };
+  /** Erro que carrega a mensagem do servidor, para o toast poder mostrar. */
+  function ApiError(message, status) {
+    this.name = 'ApiError';
+    this.message = message || 'Não conseguimos falar com o servidor.';
+    this.status = status || 0;
+  }
+  ApiError.prototype = Object.create(Error.prototype);
+  ApiError.prototype.constructor = ApiError;
+
+  function api(method, path, body) {
+    var init = { method: method, credentials: 'same-origin' };
+    if (body !== undefined) {
+      init.headers = { 'Content-Type': 'application/json' };
+      init.body = JSON.stringify(body);
+    }
+
+    return window.fetch('/api' + path, init).then(function (response) {
+      return response.text().then(function (text) {
+        var payload = {};
+        try { payload = text ? JSON.parse(text) : {}; } catch (e) { payload = {}; }
+        if (!response.ok) throw new ApiError(payload.error, response.status);
+        return payload;
+      });
+    }, function () {
+      throw new ApiError('Sem conexão com o servidor. Tente de novo.', 0);
+    });
   }
 
   /* ---------------- Estado ---------------- */
 
-  var state = null;
+  function emptyState() {
+    return {
+      me: null,
+      sessionUserId: null,
+      settings: {
+        shopName: 'Léo do Corte', whatsapp: '', address: '',
+        openTime: '10:00', closeTime: '19:00', slotMinutes: SLOT, closedWeekdays: [0]
+      },
+      users: [], services: [], products: [],
+      appointments: [], orders: [], weekdayRules: [], comboRules: []
+    };
+  }
 
-  function load() {
-    var raw = null;
-    try { raw = window.localStorage.getItem(KEY); } catch (e) { raw = null; }
+  var state = emptyState();
+  var hydrated = false;
 
-    if (!raw) { state = seed(); save(); return state; }
-
-    try {
-      var parsed = JSON.parse(raw);
-      state = migrate(parsed);
-    } catch (e) {
-      state = seed();
-    }
-    save();
+  function applyBootstrap(data) {
+    state = {
+      me: data.me || null,
+      /* O cart usa sessionUserId; a sessão real é o cookie assinado. */
+      sessionUserId: data.me ? data.me.id : null,
+      settings: data.settings || emptyState().settings,
+      /* Cliente não recebe a lista de usuários: só ele mesmo. */
+      users: (data.users && data.users.length) ? data.users : (data.me ? [data.me] : []),
+      services: data.services || [],
+      products: data.products || [],
+      appointments: data.appointments || [],
+      orders: data.orders || [],
+      weekdayRules: data.weekdayRules || [],
+      comboRules: data.comboRules || []
+    };
+    hydrated = true;
     return state;
   }
 
-  /** Garante que bases antigas/incompletas ganhem as chaves novas sem perder dados. */
-  function migrate(data) {
-    var base = seed();
-    if (!data || typeof data !== 'object') return base;
-
-    ['users', 'services', 'products', 'appointments', 'orders', 'weekdayRules', 'comboRules'].forEach(function (k) {
-      if (!Array.isArray(data[k])) data[k] = base[k];
-    });
-    data.settings = Object.assign({}, base.settings, data.settings || {});
-
-    /* A v1 trazia contato de exemplo ("Rua das Tesouras", telefone 5511…).
-       A v2 traz os dados reais da barbearia, então eles substituem o que
-       estava gravado — senão quem já abriu a app continuaria vendo o
-       endereço falso, porque os dados salvos têm precedência no merge. */
-    if (!data.version || data.version < 2) {
-      data.settings.shopName = base.settings.shopName;
-      data.settings.whatsapp = base.settings.whatsapp;
-      data.settings.address = base.settings.address;
-      data.users.forEach(function (u) {
-        if (u.id === 'u_admin') {
-          u.name = base.users[0].name;
-          u.phone = base.users[0].phone;
-        }
-      });
-    }
-
-    if (!data.users.length) data.users = base.users;
-    if (!data.services.length) data.services = base.services;
-    data.version = base.version;
-    return data;
+  /** Busca tudo do servidor. O boot espera por isso antes de renderizar. */
+  function hydrate() {
+    return api('GET', '/bootstrap').then(applyBootstrap);
   }
 
-  function save() {
-    try { window.localStorage.setItem(KEY, JSON.stringify(state)); }
-    catch (e) { /* modo privado / cota cheia: a app continua funcionando em memória */ }
-  }
+  function get() { return state; }
+  function isHydrated() { return hydrated; }
 
-  function get() { return state || load(); }
+  /* Sem efeito: a fonte de verdade é o banco. Mantido porque algumas telas
+     chamavam save() depois de mexer no estado. */
+  function save() {}
 
-  function reset() {
-    try { window.localStorage.removeItem(KEY); } catch (e) {}
-    state = seed();
-    save();
-  }
-
-  /* ---------------- Carrinho (por usuário, na sessão) ---------------- */
+  /* ---------------- Carrinho (por usuário, no navegador) ---------------- */
 
   function cartKey() {
-    var s = get();
-    return KEY + '.cart.' + (s.sessionUserId || 'guest');
+    return KEY + '.cart.' + (state.sessionUserId || 'guest');
   }
 
   function getCart() {
@@ -359,11 +296,8 @@ window.App = window.App || {};
 
   /* ---------------- Consultas ---------------- */
 
-  function currentUser() {
-    var s = get();
-    if (!s.sessionUserId) return null;
-    return s.users.filter(function (u) { return u.id === s.sessionUserId; })[0] || null;
-  }
+  /** Vem do servidor no bootstrap, não de uma busca na lista de usuários. */
+  function currentUser() { return state.me || null; }
 
   function userById(id) {
     return get().users.filter(function (u) { return u.id === id; })[0] || null;
@@ -412,6 +346,10 @@ window.App = window.App || {};
   /**
    * Disponibilidade de cada slot para um serviço numa data.
    * Retorna [{ time, available, reason }]
+   *
+   * Isto é para EXIBIR. A decisão final é do servidor, em api/_slots.js mais
+   * a chave primária de appointment_slots — aqui pode estar desatualizado se
+   * alguém reservou há segundos.
    */
   function slotAvailability(iso, durationMin, ignoreAppointmentId) {
     var s = get();
@@ -453,114 +391,112 @@ window.App = window.App || {};
     return !!(found && found.available);
   }
 
-  /* ---------------- Mutações ---------------- */
+  /* ---------------- Mutações (assíncronas) ---------------- */
+
+  function replaceInList(list, item) {
+    var index = -1;
+    list.forEach(function (row, i) { if (row.id === item.id) index = i; });
+    if (index === -1) list.push(item); else list[index] = item;
+    return item;
+  }
 
   function createAppointment(data) {
-    var s = get();
-    var appointment = {
-      id: uid('ap'),
-      userId: data.userId,
+    return api('POST', '/appointments', {
       serviceId: data.serviceId,
-      serviceName: data.serviceName,
-      duration: data.duration,
       date: data.date,
       time: data.time,
-      priceBase: data.priceBase,
       discount: data.discount || 0,
-      priceFinal: data.priceFinal,
-      appliedRules: data.appliedRules || [],
-      status: 'confirmado',
-      createdAt: new Date().toISOString()
-    };
-    s.appointments.push(appointment);
-    save();
-    return appointment;
+      appliedRules: data.appliedRules || []
+    }).then(function (payload) {
+      return replaceInList(state.appointments, payload.appointment);
+    });
   }
 
   function updateAppointment(id, patch) {
-    var s = get();
-    var found = s.appointments.filter(function (a) { return a.id === id; })[0];
-    if (!found) return null;
-    Object.assign(found, patch);
-    save();
-    return found;
+    return api('PATCH', '/appointments/' + encodeURIComponent(id), {
+      date: patch.date,
+      time: patch.time
+    }).then(function (payload) {
+      return replaceInList(state.appointments, payload.appointment);
+    });
   }
 
-  function cancelAppointment(id, by) {
-    return updateAppointment(id, {
-      status: 'cancelado',
-      cancelledAt: new Date().toISOString(),
-      cancelledBy: by || 'cliente'
+  function cancelAppointment(id) {
+    return api('DELETE', '/appointments/' + encodeURIComponent(id)).then(function (payload) {
+      return replaceInList(state.appointments, payload.appointment);
     });
   }
 
   function saveProduct(data) {
-    var s = get();
-    if (data.id) {
-      var found = s.products.filter(function (p) { return p.id === data.id; })[0];
-      if (found) { Object.assign(found, data); save(); return found; }
-    }
-    var created = Object.assign({ id: uid('p'), active: true }, data);
-    s.products.push(created);
-    save();
-    return created;
+    return api('POST', '/products', data).then(function (payload) {
+      return replaceInList(state.products, payload.product);
+    });
   }
 
   function removeProduct(id) {
-    var s = get();
-    s.products = s.products.filter(function (p) { return p.id !== id; });
-    setCart(getCart().filter(function (i) { return i.productId !== id; }));
-    save();
+    return api('DELETE', '/products/' + encodeURIComponent(id)).then(function () {
+      state.products = state.products.filter(function (p) { return p.id !== id; });
+      setCart(getCart().filter(function (i) { return i.productId !== id; }));
+    });
   }
 
   function saveWeekdayRule(data) {
-    var s = get();
-    if (data.id) {
-      var found = s.weekdayRules.filter(function (r) { return r.id === data.id; })[0];
-      if (found) { Object.assign(found, data); save(); return found; }
-    }
-    var created = Object.assign({ id: uid('wd'), active: true }, data);
-    s.weekdayRules.push(created);
-    save();
-    return created;
+    return api('POST', '/rules', Object.assign({ kind: 'weekday' }, data)).then(function (payload) {
+      return replaceInList(state.weekdayRules, payload.rule);
+    });
   }
 
   function removeWeekdayRule(id) {
-    var s = get();
-    s.weekdayRules = s.weekdayRules.filter(function (r) { return r.id !== id; });
-    save();
+    return api('DELETE', '/rules/' + encodeURIComponent(id) + '?kind=weekday').then(function () {
+      state.weekdayRules = state.weekdayRules.filter(function (r) { return r.id !== id; });
+    });
   }
 
   function saveComboRule(data) {
-    var s = get();
-    if (data.id) {
-      var found = s.comboRules.filter(function (r) { return r.id === data.id; })[0];
-      if (found) { Object.assign(found, data); save(); return found; }
-    }
-    var created = Object.assign({ id: uid('cb'), active: true }, data);
-    s.comboRules.push(created);
-    save();
-    return created;
+    return api('POST', '/rules', Object.assign({ kind: 'combo' }, data)).then(function (payload) {
+      return replaceInList(state.comboRules, payload.rule);
+    });
   }
 
   function removeComboRule(id) {
-    var s = get();
-    s.comboRules = s.comboRules.filter(function (r) { return r.id !== id; });
-    save();
+    return api('DELETE', '/rules/' + encodeURIComponent(id) + '?kind=combo').then(function () {
+      state.comboRules = state.comboRules.filter(function (r) { return r.id !== id; });
+    });
   }
 
   function saveSettings(patch) {
-    var s = get();
-    Object.assign(s.settings, patch);
-    save();
+    var merged = Object.assign({}, state.settings, patch);
+    return api('PUT', '/settings', merged).then(function (payload) {
+      state.settings = payload.settings;
+      return state.settings;
+    });
   }
 
   function recordOrder(order) {
-    var s = get();
-    var created = Object.assign({ id: uid('or'), createdAt: new Date().toISOString() }, order);
-    s.orders.push(created);
-    save();
-    return created;
+    return api('POST', '/orders', {
+      items: (order.items || []).map(function (i) {
+        return { productId: i.productId, size: i.size, qty: i.qty };
+      }),
+      discount: order.discount || 0
+    }).then(function (payload) {
+      state.orders.unshift(payload.order);
+      return payload.order;
+    });
+  }
+
+  /* ---------------- Sessão ---------------- */
+
+  function login(email, password) {
+    return api('POST', '/auth/login', { email: email, password: password })
+      .then(function () { return hydrate(); });
+  }
+
+  function register(data) {
+    return api('POST', '/auth/register', data).then(function () { return hydrate(); });
+  }
+
+  function logout() {
+    return api('POST', '/auth/logout').then(function () { return hydrate(); });
   }
 
   /* ---------------- Export ---------------- */
@@ -578,8 +514,9 @@ window.App = window.App || {};
   };
 
   window.App.store = {
-    KEY: KEY,
-    load: load, save: save, get: get, reset: reset,
+    KEY: KEY, ApiError: ApiError,
+    api: api, hydrate: hydrate, isHydrated: isHydrated, get: get, save: save,
+    login: login, register: register, logout: logout,
     getCart: getCart, setCart: setCart, clearCart: clearCart,
     absorbGuestCart: absorbGuestCart, setCartQty: setCartQty,
     cartDetailed: cartDetailed, cartCount: cartCount,
@@ -595,6 +532,4 @@ window.App = window.App || {};
     saveComboRule: saveComboRule, removeComboRule: removeComboRule,
     saveSettings: saveSettings, recordOrder: recordOrder
   };
-
-  load();
 })();

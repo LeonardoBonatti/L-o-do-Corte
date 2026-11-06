@@ -334,22 +334,30 @@
       body: preview,
       confirmText: 'Abrir WhatsApp',
       onConfirm: function () {
-        store.recordOrder({
-          userId: user.id,
-          userName: user.name,
-          items: cart.map(function (i) {
-            return { productId: i.productId, title: i.title, size: i.size, qty: i.qty, unitPrice: i.unitPrice };
-          }),
-          subtotal: calc.subtotalProducts,
-          discount: calc.discountProducts,
-          total: calc.totalProducts,
-          status: 'enviado'
-        });
-
+        /*
+         * O WhatsApp abre AGORA, ainda dentro do clique. Se esperássemos o
+         * servidor responder, o navegador trataria a janela como popup não
+         * solicitado e bloquearia — o registro do pedido vem depois.
+         */
         var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
         window.open(url, '_blank', 'noopener');
-        app.toast('Pedido registrado. Finalize a conversa no WhatsApp.', 'ok');
-        app.render();
+
+        store.recordOrder({
+          items: cart.map(function (i) {
+            return { productId: i.productId, size: i.size, qty: i.qty };
+          }),
+          discount: calc.discountProducts
+        }).then(function () {
+          app.toast('Pedido registrado. Finalize a conversa no WhatsApp.', 'ok');
+          app.render();
+        }).catch(function (err) {
+          app.toast(
+            'A conversa abriu, mas o pedido não entrou no painel: ' +
+            (err && err.message ? err.message : 'erro no servidor'),
+            'err'
+          );
+          app.render();
+        });
       }
     });
   }

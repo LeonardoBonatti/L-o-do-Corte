@@ -195,9 +195,12 @@
       cancelText: 'Voltar',
       danger: true,
       onConfirm: function () {
-        store.cancelAppointment(id, 'barbeiro');
-        app.toast('Agendamento cancelado.', 'info');
-        app.render();
+        store.cancelAppointment(id).then(function () {
+          app.toast('Agendamento cancelado.', 'info');
+          app.render();
+        }).catch(function (err) {
+          app.toast(err && err.message ? err.message : 'Não conseguimos cancelar agora.', 'err');
+        });
       }
     });
   }
@@ -254,9 +257,11 @@
         if (!store.isSlotFree(values.date, values.time, a.duration, a.id)) {
           return 'Esse horário não está livre para a duração do serviço.';
         }
-        store.updateAppointment(id, { date: values.date, time: values.time, status: 'confirmado' });
-        app.toast('Horário remarcado para ' + utils.formatDateShort(values.date) + ' às ' + values.time + '.', 'ok');
-        app.render();
+        return store.updateAppointment(id, { date: values.date, time: values.time })
+          .then(function () {
+            app.toast('Horário remarcado para ' + utils.formatDateShort(values.date) + ' às ' + values.time + '.', 'ok');
+            app.render();
+          });
       }
     });
   }
@@ -389,16 +394,17 @@
       onConfirm: function (values) {
         var error = validateProduct(values);
         if (error) return error;
-        store.saveProduct({
+        return store.saveProduct({
           title: values.title.trim(),
           image: (values.image || '').trim(),
           price: parseFloat(values.price),
           desc: (values.desc || '').trim(),
           active: values.active !== '0',
           sizes: parseSizes(values.sizes)
+        }).then(function () {
+          app.toast('Produto cadastrado.', 'ok');
+          app.render();
         });
-        app.toast('Produto cadastrado.', 'ok');
-        app.render();
       }
     });
   }
@@ -415,7 +421,7 @@
       onConfirm: function (values) {
         var error = validateProduct(values);
         if (error) return error;
-        store.saveProduct({
+        return store.saveProduct({
           id: id,
           title: values.title.trim(),
           image: (values.image || '').trim(),
@@ -423,9 +429,10 @@
           desc: (values.desc || '').trim(),
           active: values.active !== '0',
           sizes: parseSizes(values.sizes)
+        }).then(function () {
+          app.toast('Produto atualizado.', 'ok');
+          app.render();
         });
-        app.toast('Produto atualizado.', 'ok');
-        app.render();
       }
     });
   }
@@ -436,6 +443,25 @@
     if (isNaN(price) || price < 0) return 'Informe um valor válido.';
     if (!parseSizes(values.sizes).length) return 'Informe ao menos um tamanho, no formato P:4.';
     return null;
+  }
+
+  /**
+   * A API grava o produto inteiro (upsert), não um pedaço. Então para mudar
+   * só o estoque ou só a visibilidade é preciso remontar o resto a partir do
+   * que já está carregado.
+   */
+  function productPayload(product, overrides) {
+    return Object.assign({
+      id: product.id,
+      title: product.title,
+      image: product.image || '',
+      price: product.price,
+      desc: product.desc || '',
+      active: product.active !== false,
+      sizes: (product.sizes || []).map(function (s) {
+        return { size: s.size, qty: Number(s.qty) || 0 };
+      })
+    }, overrides || {});
   }
 
   function editStock(id) {
@@ -463,9 +489,11 @@
           var qty = parseInt(values['qty_' + index], 10);
           return { size: s.size, qty: isNaN(qty) || qty < 0 ? 0 : qty };
         });
-        store.saveProduct({ id: id, sizes: updated });
-        app.toast('Estoque atualizado.', 'ok');
-        app.render();
+        return store.saveProduct(productPayload(product, { sizes: updated }))
+          .then(function () {
+            app.toast('Estoque atualizado.', 'ok');
+            app.render();
+          });
       }
     });
   }
@@ -473,10 +501,15 @@
   function toggleProduct(id) {
     var product = store.productById(id);
     if (!product) return;
+    var app = window.App.app;
     var wasActive = product.active !== false;
-    store.saveProduct({ id: id, active: !wasActive });
-    window.App.app.toast(wasActive ? 'Produto oculto da loja.' : 'Produto publicado.', 'info');
-    window.App.app.render();
+
+    store.saveProduct(productPayload(product, { active: !wasActive })).then(function () {
+      app.toast(wasActive ? 'Produto oculto da loja.' : 'Produto publicado.', 'info');
+      app.render();
+    }).catch(function (err) {
+      app.toast(err && err.message ? err.message : 'Não conseguimos salvar agora.', 'err');
+    });
   }
 
   function deleteProduct(id) {
@@ -491,9 +524,12 @@
       confirmText: 'Excluir',
       danger: true,
       onConfirm: function () {
-        store.removeProduct(id);
-        app.toast('Produto excluído.', 'info');
-        app.render();
+        store.removeProduct(id).then(function () {
+          app.toast('Produto excluído.', 'info');
+          app.render();
+        }).catch(function (err) {
+          app.toast(err && err.message ? err.message : 'Não conseguimos excluir agora.', 'err');
+        });
       }
     });
   }
@@ -646,7 +682,7 @@
         if (!values.label || values.label.trim().length < 2) return 'Dê um nome à promoção.';
         if (isNaN(percent) || percent < 1 || percent > 100) return 'O desconto deve ficar entre 1% e 100%.';
 
-        store.saveWeekdayRule({
+        return store.saveWeekdayRule({
           id: rule ? rule.id : undefined,
           label: values.label.trim(),
           weekday: parseInt(values.weekday, 10) || 0,
@@ -654,9 +690,10 @@
           scope: values.scope,
           serviceId: values.scope === 'servico' ? values.serviceId : null,
           active: !!values.active
+        }).then(function () {
+          app.toast('Promoção salva.', 'ok');
+          app.render();
         });
-        app.toast('Promoção salva.', 'ok');
-        app.render();
       }
     });
   }
@@ -707,16 +744,17 @@
         if (isNaN(percent) || percent < 1 || percent > 100) return 'O desconto deve ficar entre 1% e 100%.';
         if (minS <= 0 && minP <= 0) return 'Defina ao menos um mínimo de serviços ou de peças.';
 
-        store.saveComboRule({
+        return store.saveComboRule({
           id: rule ? rule.id : undefined,
           label: values.label.trim(),
           minServices: minS,
           minProducts: minP,
           percent: percent,
           active: !!values.active
+        }).then(function () {
+          app.toast('Combo salvo.', 'ok');
+          app.render();
         });
-        app.toast('Combo salvo.', 'ok');
-        app.render();
       }
     });
   }
@@ -735,10 +773,16 @@
 
     if (action === 'toggle') {
       var wasActive = !!rule.active;
-      var patch = { id: id, active: !wasActive };
-      if (kind === 'wd') store.saveWeekdayRule(patch); else store.saveComboRule(patch);
-      app.toast(wasActive ? 'Regra pausada.' : 'Regra ativada.', 'info');
-      app.render();
+      /* A API grava a regra inteira, então o resto vem do que já está na tela. */
+      var patch = Object.assign({}, rule, { active: !wasActive });
+      var pending = kind === 'wd' ? store.saveWeekdayRule(patch) : store.saveComboRule(patch);
+
+      pending.then(function () {
+        app.toast(wasActive ? 'Regra pausada.' : 'Regra ativada.', 'info');
+        app.render();
+      }).catch(function (err) {
+        app.toast(err && err.message ? err.message : 'Não conseguimos salvar agora.', 'err');
+      });
       return;
     }
 
@@ -749,9 +793,13 @@
         confirmText: 'Excluir',
         danger: true,
         onConfirm: function () {
-          if (kind === 'wd') store.removeWeekdayRule(id); else store.removeComboRule(id);
-          app.toast('Regra excluída.', 'info');
-          app.render();
+          var pending = kind === 'wd' ? store.removeWeekdayRule(id) : store.removeComboRule(id);
+          pending.then(function () {
+            app.toast('Regra excluída.', 'info');
+            app.render();
+          }).catch(function (err) {
+            app.toast(err && err.message ? err.message : 'Não conseguimos excluir agora.', 'err');
+          });
         }
       });
     }
@@ -860,11 +908,9 @@
                 '<td class="nowrap">' + utils.slotsNeeded(svc.duration) + '</td></tr>';
             }).join('') +
             '</tbody></table></div>' +
-          '<div class="promo-note" style="margin-top:14px"><span>⚠</span><span>' +
-            'Todos os dados ficam no <b>localStorage</b> deste navegador. Limpar os dados do site apaga ' +
-            'agendamentos, produtos e regras.</span></div>' +
-          '<button class="btn btn-danger" type="button" data-action="adm-reset" style="margin-top:6px">' +
-            'Restaurar dados de demonstração</button>' +
+          '<div class="promo-note" style="margin-top:14px"><span>✓</span><span>' +
+            'Os dados ficam no <b>banco de dados</b>, compartilhados entre todos os aparelhos: ' +
+            'o agendamento que a cliente faz no celular dela aparece nesta agenda.</span></div>' +
         '</div>' +
       '</section>';
   }
@@ -899,27 +945,11 @@
       openTime: values.openTime,
       closeTime: values.closeTime,
       closedWeekdays: closed
-    });
-
-    app.toast('Ajustes salvos.', 'ok');
-    app.render();
-  }
-
-  function resetData() {
-    var app = window.App.app;
-    app.confirmModal({
-      title: 'Restaurar dados de demonstração?',
-      body: '<p>Todos os agendamentos, clientes, produtos, pedidos e regras criados serão apagados ' +
-        'e substituídos pelos dados iniciais.</p><p class="muted">Isso não pode ser desfeito.</p>',
-      confirmText: 'Restaurar',
-      danger: true,
-      onConfirm: function () {
-        store.reset();
-        store.clearCart();
-        app.toast('Dados restaurados. Faça login novamente.', 'info');
-        window.location.hash = '#/entrar';
-        app.render();
-      }
+    }).then(function () {
+      app.toast('Ajustes salvos.', 'ok');
+      app.render();
+    }).catch(function (err) {
+      app.toast(err && err.message ? err.message : 'Não conseguimos salvar agora.', 'err');
     });
   }
 
@@ -931,6 +961,6 @@
     newProduct: newProduct, editProduct: editProduct, editStock: editStock,
     toggleProduct: toggleProduct, deleteProduct: deleteProduct,
     weekdayModal: weekdayModal, comboModal: comboModal, ruleAction: ruleAction,
-    saveSettingsForm: saveSettingsForm, resetData: resetData
+    saveSettingsForm: saveSettingsForm
   };
 })();

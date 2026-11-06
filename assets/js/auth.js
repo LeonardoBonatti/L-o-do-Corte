@@ -1,6 +1,10 @@
 /* ============================================================
-   auth.js — cadastro, login, sessão e tela de autenticação
+   auth.js — sessão e tela de acesso
    Expõe: window.App.auth
+
+   O login e o cadastro agora acontecem no servidor: a senha vai por POST,
+   é verificada contra um hash scrypt e a sessão volta num cookie assinado
+   httpOnly, que o JavaScript não consegue ler.
    ============================================================ */
 
 (function () {
@@ -16,55 +20,13 @@
   function isLogged() { return !!current(); }
   function isAdmin() { var u = current(); return !!u && u.role === 'admin'; }
 
-  function login(email, password) {
-    var state = store.get();
-    var key = String(email || '').trim().toLowerCase();
-    var user = state.users.filter(function (u) {
-      return String(u.email).toLowerCase() === key;
-    })[0];
-
-    if (!user) return { ok: false, error: 'Não encontramos uma conta com esse e-mail.' };
-    if (user.password !== password) return { ok: false, error: 'Senha incorreta. Tente novamente.' };
-
-    state.sessionUserId = user.id;
-    store.save();
-    return { ok: true, user: user };
-  }
-
-  function register(data) {
-    var state = store.get();
-    var name = String(data.name || '').trim();
-    var email = String(data.email || '').trim().toLowerCase();
-    var phone = utils.digitsOnly(data.phone);
-    var password = String(data.password || '');
-
-    if (name.length < 3) return { ok: false, error: 'Informe seu nome completo.' };
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, error: 'Informe um e-mail válido.' };
-    if (phone.length < 10) return { ok: false, error: 'Informe um celular com DDD (10 ou 11 dígitos).' };
-    if (password.length < 4) return { ok: false, error: 'A senha precisa ter ao menos 4 caracteres.' };
-
-    var taken = state.users.some(function (u) { return String(u.email).toLowerCase() === email; });
-    if (taken) return { ok: false, error: 'Esse e-mail já está cadastrado. Faça login.' };
-
-    var user = {
-      id: utils.uid('u'), name: name, email: email, phone: phone,
-      password: password, role: 'cliente', createdAt: new Date().toISOString()
-    };
-    state.users.push(user);
-    state.sessionUserId = user.id;
-    store.save();
-    return { ok: true, user: user };
-  }
-
   function logout() {
-    var state = store.get();
-    state.sessionUserId = null;
-    store.save();
+    return store.logout();
   }
 
   /**
    * Garante login antes de uma ação. Se deslogado, manda para a tela de
-   * acesso guardando o destino em `redirectTo`.
+   * acesso guardando o destino em `pendingRedirect`.
    */
   function requireLogin(redirectTo) {
     if (isLogged()) return true;
@@ -149,7 +111,7 @@
           '<div class="field">' +
             '<label for="reg-password">Senha</label>' +
             '<input id="reg-password" name="password" type="password" autocomplete="new-password" placeholder="mínimo 4 caracteres" required>' +
-            '<span class="hint">Os dados ficam salvos apenas neste navegador.</span>' +
+            '<span class="hint">Guardamos sua senha com hash, nunca em texto puro.</span>' +
           '</div>' +
           '<button class="btn btn-primary btn-block" type="submit">Criar conta e continuar</button>' +
           '<p class="auth-switch">Já tem conta? ' +
@@ -178,25 +140,33 @@
       if (el.name) data[el.name] = el.value;
     });
 
-    var result = kind === 'login'
-      ? login(data.email, data.password)
-      : register(data);
+    var button = form.querySelector('[type="submit"]');
+    var label = button ? button.textContent : '';
+    if (button) { button.disabled = true; button.textContent = 'Aguarde…'; }
 
-    if (!result.ok) { showError(result.error); return; }
+    var action = kind === 'login'
+      ? store.login(data.email, data.password)
+      : store.register(data);
 
-    store.absorbGuestCart();
+    action.then(function () {
+      store.absorbGuestCart();
 
-    var app = window.App.app;
-    var target = app.pendingRedirect || (result.user.role === 'admin' ? '#/painel' : '#/agendamento');
-    app.pendingRedirect = null;
-    app.toast('Bem-vindo, ' + result.user.name.split(' ')[0] + '!', 'ok');
-    window.location.hash = target;
-    app.render();
+      var app = window.App.app;
+      var user = current();
+      var target = app.pendingRedirect || (user && user.role === 'admin' ? '#/painel' : '#/agendamento');
+      app.pendingRedirect = null;
+      app.toast('Bem-vindo, ' + (user ? user.name.split(' ')[0] : '') + '!', 'ok');
+      window.location.hash = target;
+      app.render();
+    }).catch(function (err) {
+      if (button) { button.disabled = false; button.textContent = label; }
+      showError(err && err.message ? err.message : 'Não conseguimos entrar agora.');
+    });
   }
 
   window.App.auth = {
     current: current, isLogged: isLogged, isAdmin: isAdmin,
-    login: login, register: register, logout: logout, requireLogin: requireLogin,
+    logout: logout, requireLogin: requireLogin,
     render: render, handleSubmit: handleSubmit, setMode: setMode
   };
 })();

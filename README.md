@@ -7,35 +7,60 @@ com carrinho integrado ao WhatsApp e painel administrativo do barbeiro.
 (19) 99928-7339. Os dados ficam em *Ajustes* no painel do barbeiro e podem ser
 trocados sem mexer no código.
 
-**Sem build, sem dependências, sem servidor.** HTML + CSS + JavaScript clássico.
-Basta abrir `index.html` no navegador (duplo clique funciona).
+**Front-end sem build** — HTML + CSS + JavaScript clássico, sem bundler — sobre
+**Postgres na Vercel** com funções serverless em `/api`.
+
+A agenda é compartilhada: o horário que a cliente marca no celular dela aparece
+na agenda do barbeiro, e dois clientes não conseguem pegar o mesmo horário.
+Como a app depende da API, **ela não abre mais por duplo clique no arquivo**.
 
 ---
 
 ## Como rodar
 
-Abra `index.html` no Chrome, Edge ou Firefox.
+São três passos. Nada para instalar.
 
-Se preferir servir por HTTP (opcional — não é necessário):
+**1. Criar as tabelas.** Cole [db/setup.sql](db/setup.sql) inteiro no SQL
+Editor do Neon e rode. Cria as tabelas e já insere serviços, produtos,
+promoções e os dados da barbearia. Pode rodar de novo sem medo: nada é
+duplicado e nada que o barbeiro editou no painel é sobrescrito.
+
+**2. Uma variável na Vercel.** Em *Settings → Environment Variables*, marcando
+*Production* **e** *Preview*:
 
 ```bash
-npx --yes serve .
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-### Contas
+Esse valor é o `AUTH_SECRET`, que assina o cookie de sessão. Sem ele o login
+responde erro 500. Trocá-lo depois desloga todo mundo de uma vez.
 
-| Perfil | E-mail | Senha |
-| --- | --- | --- |
-| Barbeiro (admin) | `leo@leodocorte.com` | `leo123` |
-| Cliente | crie pela tela **Criar conta** | — |
+A URL do banco já vem da integração do Neon ou do Vercel Postgres — o código
+aceita `DATABASE_URL` e `POSTGRES_URL`, então não há nada a fazer aqui.
 
-> São credenciais de demonstração, gravadas em texto puro no seed. Em produção,
-> troque por um backend com hash de senha.
->
-> **O acesso do barbeiro não aparece mais na tela de login** — ela é a área do
-> cliente. Entre com o e-mail acima para cair no painel. Como não há backend,
-> essa senha não protege nada: ela só destrava o painel sobre os dados que já
-> estão no `localStorage` de quem abriu a página.
+**3. A conta do barbeiro.** Crie pela própria tela **Criar conta** do site, com
+a senha que quiser, e então rode uma linha no SQL Editor:
+
+```sql
+update users set role = 'admin' where lower(email) = 'seu@email.com';
+```
+
+No próximo login aparece o Painel do Barbeiro.
+
+> **Nenhuma credencial vive no repositório.** A senha é gravada pela própria
+> app como hash `scrypt` com salt, nunca em texto puro, e a tela de login não
+> anuncia o acesso do barbeiro — ela é a área do cliente.
+
+### Rodar local (opcional)
+
+Só se você quiser mexer no back-end. Precisa da CLI da Vercel:
+
+```bash
+vercel env pull .env.development.local
+npm install
+npm run migrate    # mesmo SQL do passo 1, por linha de comando
+vercel dev
+```
 
 ---
 
@@ -45,7 +70,7 @@ npx --yes serve .
 index.html
 assets/
   css/styles.css        tokens de cor, componentes e responsividade
-  js/store.js           persistência (localStorage), seed, consultas e utilitários
+  js/store.js           cliente da API, cache em memória, consultas e utilitários
   js/discounts.js       motor de descontos (dia da semana + combo)
   js/auth.js            cadastro, login, sessão e tela de acesso
   js/booking.js         agendamento: serviço, dia, slots e confirmação
@@ -53,20 +78,58 @@ assets/
   js/my-bookings.js     "Meus Agendamentos" (próximos, histórico, cancelamento)
   js/admin.js           painel do barbeiro (agenda, estoque, promoções, pedidos, ajustes)
   js/app.js             roteador por hash, navegação, home, modais e toasts
+api/
+  _db.js                pool do Postgres e transações
+  _auth.js              hash scrypt da senha e cookie de sessão assinado
+  _slots.js             regras de horário no servidor
+  _shape.js             linha do banco -> formato que o cliente espera
+  bootstrap.js          GET: tudo que a app precisa, filtrado por papel
+  auth/                 register, login, logout, me
+  appointments/         criar, remarcar, cancelar
+  products/, rules/     CRUD do painel
+  orders.js, settings.js
+db/
+  setup.sql             tabelas + dados iniciais, numa colagem só
+scripts/
+  migrate.mjs           roda o setup.sql por linha de comando (opcional)
+  hash-password.mjs     gera um hash de senha, se precisar criar admin por SQL
 apresentacao.html       apresentação animada (arquivo único, toca no navegador)
 motion/                 projeto Remotion que gera o vídeo .mp4 da apresentação
 ```
 
-Os scripts são carregados na ordem acima e cada um publica seu módulo em
-`window.App`. Não há `type="module"`, justamente para que a aplicação funcione
-abrindo o arquivo direto do disco (`file://`).
+Os scripts do front são carregados na ordem acima e cada um publica seu módulo
+em `window.App`. Não há `type="module"` nem bundler: os arquivos vão para o
+navegador como estão.
 
 ### Dados
 
-Tudo vive no `localStorage` do navegador, na chave `leodocorte.v1`
-(carrinho em `leodocorte.v1.cart.<usuário>`). Limpar os dados do site apaga
-agendamentos, clientes, produtos e regras. O painel tem o botão
-**Restaurar dados de demonstração** em *Ajustes*.
+O banco é a fonte de verdade. A app busca tudo numa chamada a
+`GET /api/bootstrap` no carregamento e guarda em memória — é isso que permite
+manter as leituras síncronas espalhadas pelas telas (`store.get()`,
+`slotAvailability()`…) sem reescrever o código de renderização. Só as escritas
+são assíncronas. Ao voltar para a aba, a app rebusca, porque outra pessoa pode
+ter reservado um horário nesse meio-tempo.
+
+**A resposta é filtrada por papel.** Cliente recebe os próprios agendamentos e
+pedidos por inteiro; os de terceiros chegam apenas como "slot ocupado", sem
+nome, telefone, serviço ou valor. O barbeiro recebe tudo, mais a lista de
+clientes. Hash de senha não sai do servidor em nenhum caso.
+
+A única exceção é o **carrinho**, que continua no `localStorage` em
+`leodocorte.v1.cart.<usuário>`: é rascunho por navegador, e migra para a conta
+no login. Não segue o cliente entre aparelhos.
+
+### Por que dois clientes não pegam o mesmo horário
+
+A tabela `appointment_slots` tem uma linha por slot de 30 min ocupado, com
+`(data, hora)` como chave primária. O agendamento e os seus slots nascem na
+mesma transação — um serviço de 45 min grava **dois** slots, o escolhido e o
+seguinte. Se outra pessoa chegou primeiro, o insert viola a chave e a transação
+inteira é desfeita.
+
+A grade que aparece na tela é só exibição e pode estar segundos atrasada. Quem
+decide é o banco, mais a validação em `api/_slots.js` — um cliente que adultere
+o JavaScript não contorna nenhum dos dois.
 
 ---
 
@@ -170,26 +233,31 @@ um ponto dourado no seletor de data.
 
 ## Decisões e limites
 
-- **Sem backend.** Os dados são locais ao navegador e não sincronizam entre
-  dispositivos. Para produção, o próximo passo natural é trocar `store.js` por
-  chamadas a uma API — a interface já está isolada atrás dele.
+- **Depende da API.** Sem banco a app não abre: mostra "não conseguimos
+  carregar a agenda" e um botão de tentar de novo. Não existe modo offline,
+  justamente para ninguém marcar horário num banco de mentira achando que o
+  recado chegou.
+- **Descontos são calculados no cliente.** O servidor grava o preço base do
+  serviço vindo do banco e limita o desconto ao intervalo possível, então não
+  nasce agendamento de valor negativo — mas o percentual em si vem da tela. Em
+  pedidos de vestuário o servidor recalcula o subtotal pelos preços do banco.
+  Como o pagamento é combinado pessoalmente, nenhum dinheiro depende disso.
+- **Uma cadeira, um barbeiro.** O bloqueio por slot assume um único
+  atendimento simultâneo; atender dois clientes ao mesmo tempo exigiria
+  repensar `appointment_slots`.
 - **Estoque não é baixado no checkout.** Como a venda é negociada no WhatsApp e
   a retirada é na loja, o barbeiro ajusta a quantidade no painel quando a venda
   se concretiza.
-- **Um atendimento por vez.** A agenda assume um único barbeiro; não há recurso
-  de múltiplas cadeiras.
 - **Imagens por URL.** Produtos usam URL de foto (seed aponta para o Unsplash);
   se a imagem não carregar, o card cai no espaço reservado da loja.
-- **Verificação.** Exercitado em navegador, sobre HTTP local: cadastro de
-  cliente; agendamento de 45 min, que ocupa dois slots e deixa 18:30
-  indisponível por não caber antes do fechamento; persistência do horário
-  depois de sair, recarregar a página e entrar de novo; agenda do barbeiro
-  mostrando o atendimento com o telefone do cliente; carrinho e pedido no
-  WhatsApp, com a mensagem trazendo itens, total e o próximo horário do
-  cliente; remarcação pelo painel, com os horários revalidados para a nova
-  data; e a migração v1→v2, que troca os dados de exemplo pelos reais sem
-  perder agendamentos nem clientes. Não foram exercitados o CRUD de estoque,
-  a edição de promoções e o cancelamento pelo cliente.
+- **Verificação.** Os fluxos foram exercitados em navegador na versão anterior,
+  que guardava tudo no `localStorage`: cadastro, agendamento de 45 min com
+  18:30 indisponível, persistência após sair e voltar, agenda do barbeiro,
+  carrinho e pedido no WhatsApp, e remarcação pelo painel.
+  **Nada disso foi reexecutado contra o Postgres** — esta versão passou só por
+  `node --check`. Antes de apontar cliente para cá, repita os fluxos no preview
+  deploy e teste em especial duas sessões disputando o mesmo horário, que é o
+  caminho novo.
 
 ---
 

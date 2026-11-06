@@ -286,24 +286,29 @@
       body: lines,
       confirmText: 'Confirmar',
       onConfirm: function () {
-        var appointment = store.createAppointment({
-          userId: window.App.auth.current().id,
+        /*
+         * Quem decide é o servidor: a checagem acima olha dados que podem
+         * ter segundos de atraso, e a chave primária de appointment_slots
+         * recusa o horário se outra pessoa chegou primeiro.
+         */
+        store.createAppointment({
           serviceId: svc.id,
-          serviceName: svc.name,
-          duration: svc.duration,
           date: sel.date,
           time: sel.time,
-          priceBase: svc.price,
           discount: calc.discountServices,
-          priceFinal: calc.totalServices,
           appliedRules: calc.applied.filter(function (r) { return r.onServices > 0; })
             .map(function (r) { return { label: r.label, percent: r.percent, amount: r.onServices }; })
+        }).then(function (appointment) {
+          reset();
+          app.toast('Horário confirmado para ' + utils.formatDateShort(appointment.date) + ' às ' + appointment.time + '.', 'ok');
+          window.location.hash = '#/meus-agendamentos';
+          app.render();
+        }).catch(function (err) {
+          app.toast(err && err.message ? err.message : 'Não conseguimos confirmar agora.', 'err');
+          sel.time = null;
+          /* Rebusca para a grade já mostrar o horário tomado. */
+          store.hydrate().then(function () { app.render(); }, function () { app.render(); });
         });
-
-        reset();
-        app.toast('Horário confirmado para ' + utils.formatDateShort(appointment.date) + ' às ' + appointment.time + '.', 'ok');
-        window.location.hash = '#/meus-agendamentos';
-        app.render();
       }
     });
   }
