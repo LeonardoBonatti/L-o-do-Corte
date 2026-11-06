@@ -50,12 +50,24 @@ function statements(sqlText) {
 
 loadEnv();
 
-if (!process.env.POSTGRES_URL) {
-  console.error('\nPOSTGRES_URL não definida. Rode `vercel env pull .env.development.local` primeiro.');
+/* Vercel Postgres grava POSTGRES_URL; a integração do Neon grava DATABASE_URL. */
+const URL_VARS = [
+  'POSTGRES_URL', 'DATABASE_URL', 'POSTGRES_PRISMA_URL',
+  'POSTGRES_URL_NON_POOLING', 'DATABASE_URL_UNPOOLED'
+];
+const found = URL_VARS.find((name) => process.env[name]);
+
+if (!found) {
+  console.error(
+    '\nNenhuma URL de banco encontrada. Defina POSTGRES_URL ou DATABASE_URL' +
+    '\nnum .env.development.local na raiz do projeto.' +
+    '\nProcurei por: ' + URL_VARS.join(', ')
+  );
   process.exit(1);
 }
 
-const pool = createPool({ connectionString: process.env.POSTGRES_URL });
+console.log('usando ' + found);
+const pool = createPool({ connectionString: process.env[found] });
 
 async function runFile(relative) {
   const sqlText = fs.readFileSync(path.join(root, relative), 'utf8');

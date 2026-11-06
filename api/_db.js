@@ -10,16 +10,38 @@ const { createPool } = require('@vercel/postgres');
 
 let pool = null;
 
+/*
+ * A integração do Vercel Postgres grava POSTGRES_URL; a do Neon grava
+ * DATABASE_URL. Aceitamos as duas, preferindo sempre a versão "pooled"
+ * (host com -pooler), que é a que serve para função serverless: a
+ * não-pooled abre uma conexão por invocação e esgota o limite do banco.
+ */
+const URL_VARS = [
+  'POSTGRES_URL',
+  'DATABASE_URL',
+  'POSTGRES_PRISMA_URL',
+  'POSTGRES_URL_NON_POOLING',
+  'DATABASE_URL_UNPOOLED'
+];
+
+function connectionString() {
+  for (const name of URL_VARS) {
+    if (process.env[name]) return process.env[name];
+  }
+  return null;
+}
+
 /** Pool preguiçoso: a conexão só abre quando a primeira query precisa dela. */
 function db() {
   if (!pool) {
-    if (!process.env.POSTGRES_URL) {
+    const url = connectionString();
+    if (!url) {
       throw new Error(
-        'POSTGRES_URL não está definida. Crie o Postgres na Vercel e rode ' +
-        '`vercel env pull .env.development.local` para testar local.'
+        'Nenhuma URL de banco encontrada. Defina POSTGRES_URL ou DATABASE_URL ' +
+        '(procurei por: ' + URL_VARS.join(', ') + ').'
       );
     }
-    pool = createPool({ connectionString: process.env.POSTGRES_URL });
+    pool = createPool({ connectionString: url });
   }
   return pool;
 }
@@ -59,4 +81,4 @@ function newId(prefix) {
   return prefix + '_' + crypto.randomBytes(6).toString('hex');
 }
 
-module.exports = { db, sql, withTransaction, isUniqueViolation, newId };
+module.exports = { db, sql, withTransaction, isUniqueViolation, newId, connectionString };
