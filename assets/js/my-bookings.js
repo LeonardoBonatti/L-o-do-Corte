@@ -139,9 +139,12 @@
       cancelText: 'Manter horário',
       danger: true,
       onConfirm: function () {
-        store.cancelAppointment(id, 'cliente');
-        app.toast('Agendamento cancelado.', 'info');
-        app.render();
+        store.cancelAppointment(id).then(function () {
+          app.toast('Agendamento cancelado.', 'info');
+          app.render();
+        }).catch(function (err) {
+          app.toast(err && err.message ? err.message : 'Não conseguimos cancelar agora.', 'err');
+        });
       }
     });
   }

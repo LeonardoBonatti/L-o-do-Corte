@@ -1,0 +1,16 @@
+{
+  "name": "leo-do-corte",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicação web da barbearia Léo do Corte: agendamento, vestuário e painel do barbeiro.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "hash": "node scripts/hash-password.mjs",
+    "migrate": "node scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "@vercel/postgres": "0.10.0"
+  }
+}

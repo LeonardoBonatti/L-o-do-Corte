@@ -7,9 +7,14 @@ dist/
 # Repositório git do scaffold do Remotion, desativado para unificar o projeto
 .git.disabled/
 
-# Ambiente
+# Ambiente — o `vercel env pull` grava .env.development.local com a
+# connection string do banco. O glob cobre todas as variações.
 .env
-.env.local
+.env.*
+!.env.example
+
+# Vercel CLI
+.vercel/
 
 # Sistema operacional
 .DS_Store

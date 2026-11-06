@@ -377,9 +377,36 @@
       });
     }
 
-    var error = config.onConfirm ? config.onConfirm(values) : null;
-    if (typeof error === 'string' && error) { modalError(error); return; }
+    var result = config.onConfirm ? config.onConfirm(values) : null;
+
+    /* String = erro de validação local, mostrado dentro do modal. */
+    if (typeof result === 'string' && result) { modalError(result); return; }
+
+    /*
+     * Promise = escrita no servidor. O modal fica aberto e travado até a
+     * resposta, para que uma recusa (horário ocupado, por exemplo) apareça
+     * no próprio formulário em vez de só num toast depois de fechar.
+     */
+    if (result && typeof result.then === 'function') {
+      setModalBusy(true);
+      result.then(function () {
+        closeModal();
+      }, function (err) {
+        setModalBusy(false);
+        modalError(err && err.message ? err.message : 'Não conseguimos salvar agora.');
+      });
+      return;
+    }
+
     closeModal();
+  }
+
+  function setModalBusy(busy) {
+    var actions = document.getElementById('modal-actions');
+    if (!actions) return;
+    Array.prototype.forEach.call(actions.querySelectorAll('button'), function (button) {
+      button.disabled = !!busy;
+    });
   }
 
   function confirmModal(config) {
@@ -418,11 +445,14 @@
       cancelText: 'Fechar',
       danger: true,
       onConfirm: function () {
-        auth.logout();
-        window.App.booking.reset();
-        toast('Você saiu da conta.', 'info');
-        window.location.hash = '#/home';
-        render();
+        auth.logout().then(function () {
+          window.App.booking.reset();
+          toast('Você saiu da conta.', 'info');
+          window.location.hash = '#/home';
+          render();
+        }).catch(function (err) {
+          toast(err && err.message ? err.message : 'Não conseguimos sair agora.', 'err');
+        });
       }
     });
   }
@@ -438,6 +468,7 @@
     'modal-close': closeModal,
     'modal-confirm': submitModal,
     'user-menu': userMenu,
+    'boot-retry': function () { loadData(); },
 
     /* autenticação */
     'auth-mode': function (el) { auth.setMode(el.getAttribute('data-mode')); },
@@ -480,8 +511,7 @@
     'adm-cb-new': function () { window.App.admin.comboModal(null); },
     'adm-cb-edit': function (el) { window.App.admin.ruleAction('cb', 'edit', el.getAttribute('data-id')); },
     'adm-cb-toggle': function (el) { window.App.admin.ruleAction('cb', 'toggle', el.getAttribute('data-id')); },
-    'adm-cb-del': function (el) { window.App.admin.ruleAction('cb', 'del', el.getAttribute('data-id')); },
-    'adm-reset': function () { window.App.admin.resetData(); }
+    'adm-cb-del': function (el) { window.App.admin.ruleAction('cb', 'del', el.getAttribute('data-id')); }
   };
 
   function bind() {
@@ -542,19 +572,53 @@
       window.scrollTo({ top: 0, behavior: 'auto' });
     });
 
-    // outra aba alterou os dados
+    // outra aba deste navegador mexeu no carrinho
     window.addEventListener('storage', function (event) {
-      if (event.key && event.key.indexOf(store.KEY) === 0) { store.load(); render(); }
+      if (event.key && event.key.indexOf(store.KEY + '.cart') === 0) render();
+    });
+
+    /*
+     * Ao voltar para a aba, rebusca tudo do servidor: outra pessoa pode ter
+     * reservado um horário enquanto esta tela ficou parada em segundo plano.
+     */
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState !== 'visible' || !store.isHydrated()) return;
+      store.hydrate().then(render).catch(function () { /* mantém o que está na tela */ });
     });
   }
 
   /* ---------------- Boot ---------------- */
 
+  /* A app não tem dados antes do servidor responder. */
+  function renderBootState(html) {
+    document.getElementById('view').innerHTML =
+      '<div class="empty" style="margin-top:60px">' + html + '</div>';
+  }
+
+  /** Busca os dados e renderiza. Separado do boot para o retry não religar
+      os listeners de evento, que são registrados uma única vez. */
+  function loadData() {
+    renderChrome();
+    renderBootState('<strong>Carregando…</strong>');
+
+    return store.hydrate().then(function () {
+      render();
+    }).catch(function (err) {
+      renderBootState(
+        '<strong>Não conseguimos carregar a agenda</strong>' +
+        '<p class="muted" style="margin:10px 0 0">' + esc(err && err.message ? err.message : '') + '</p>' +
+        '<div style="margin-top:16px">' +
+          '<button class="btn btn-primary" type="button" data-action="boot-retry">Tentar de novo</button>' +
+        '</div>'
+      );
+    });
+  }
+
   function boot() {
     document.getElementById('year').textContent = new Date().getFullYear();
     if (!window.location.hash) window.location.hash = '#/home';
     bind();
-    render();
+    loadData();
   }
 
   Object.assign(app, {

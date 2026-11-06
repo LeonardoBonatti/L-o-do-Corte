@@ -1,0 +1,11 @@
+# O projeto de vídeo não vai para o deploy: são 4 MB de mp4 e a fonte Remotion,
+# que nada no site usa.
+motion/
+
+# SQL e utilitários ficam no repositório, mas não devem ser servidos na web.
+db/
+scripts/
+
+# Ferramentas locais e documentação.
+.claude/
+README.md
