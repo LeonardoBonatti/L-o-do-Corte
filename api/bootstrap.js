@@ -49,16 +49,27 @@ module.exports = async function handler(req, res) {
         .push({ size: row.size, qty: Number(row.qty) });
     });
 
-    /* A data sai como texto para não escorregar de dia no fuso do Brasil. */
-    const appointmentsRes = await sql`
-      select id, user_id, service_id, service_name, duration,
-             to_char(slot_date, 'YYYY-MM-DD') as slot_date, slot_time,
-             price_base, discount, price_final, applied_rules, status, created_at
-        from appointments
-       where status <> 'cancelado'
-          or user_id = ${me ? me.id : null}
-       order by slot_date, slot_time
-    `;
+    /*
+     * A data sai como texto para não escorregar de dia no fuso do Brasil.
+     *
+     * O barbeiro vê tudo, cancelados incluídos — a agenda dele mostra o
+     * histórico do dia. Para os outros, só os horários que ainda ocupam a
+     * grade, mais os próprios cancelados (que aparecem no histórico do
+     * cliente em "Meus agendamentos").
+     */
+    const appointmentsRes = isAdmin
+      ? await sql`select id, user_id, service_id, service_name, duration,
+                         to_char(slot_date, 'YYYY-MM-DD') as slot_date, slot_time,
+                         price_base, discount, price_final, applied_rules, status, created_at
+                    from appointments
+                   order by slot_date, slot_time`
+      : await sql`select id, user_id, service_id, service_name, duration,
+                         to_char(slot_date, 'YYYY-MM-DD') as slot_date, slot_time,
+                         price_base, discount, price_final, applied_rules, status, created_at
+                    from appointments
+                   where status <> 'cancelado'
+                      or user_id = ${me ? me.id : null}
+                   order by slot_date, slot_time`;
 
     const appointments = appointmentsRes.rows.map(function (row) {
       if (isAdmin || (me && row.user_id === me.id)) return shape.appointment(row);

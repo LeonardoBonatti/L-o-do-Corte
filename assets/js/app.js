@@ -137,6 +137,10 @@
 
   /** Botão flutuante de WhatsApp e bloco de contato no rodapé, em toda página. */
   function renderContact() {
+    /* Antes da hidratação o WhatsApp está vazio e o link sairia como
+       wa.me/55. Melhor não mostrar botão nenhum nesse instante. */
+    if (!store.isHydrated()) return;
+
     var s = store.get().settings;
     var greeting = 'Olá! Vim pelo site da ' + (s.shopName || 'barbearia') +
       ' e gostaria de falar sobre um horário.';
