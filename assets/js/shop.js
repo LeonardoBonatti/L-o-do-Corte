@@ -327,7 +327,7 @@
         : '') +
       '<div class="summary-line total"><span>Total</span><strong>' + utils.brl(calc.totalProducts) + '</strong></div>' +
       '<p class="muted" style="margin-top:12px">Vamos abrir o WhatsApp do barbeiro com esse resumo já escrito. ' +
-      'Nada é cobrado agora — o pagamento é combinado direto com o Leo.</p>';
+      'Nada é cobrado agora — o pagamento é combinado direto com o Léo.</p>';
 
     app.confirmModal({
       title: 'Enviar pedido pelo WhatsApp?',

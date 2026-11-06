@@ -171,7 +171,7 @@ window.App = window.App || {};
         {
           id: 'p_4', title: 'Boné Aba Curva Dourado', price: 69.9, active: true,
           image: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=800&q=70',
-          desc: 'Bordado Leo do Corte em fio dourado.',
+          desc: 'Bordado Léo do Corte em fio dourado.',
           sizes: [{ size: 'Único', qty: 9 }]
         },
         {

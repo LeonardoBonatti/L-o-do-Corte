@@ -180,9 +180,16 @@ um ponto dourado no seletor de data.
   de múltiplas cadeiras.
 - **Imagens por URL.** Produtos usam URL de foto (seed aponta para o Unsplash);
   se a imagem não carregar, o card cai no espaço reservado da loja.
-- **Verificação.** O código foi revisado estaticamente, mas não foi executado em
-  navegador nesta sessão — convém clicar pelos fluxos principais na primeira
-  abertura.
+- **Verificação.** Exercitado em navegador, sobre HTTP local: cadastro de
+  cliente; agendamento de 45 min, que ocupa dois slots e deixa 18:30
+  indisponível por não caber antes do fechamento; persistência do horário
+  depois de sair, recarregar a página e entrar de novo; agenda do barbeiro
+  mostrando o atendimento com o telefone do cliente; carrinho e pedido no
+  WhatsApp, com a mensagem trazendo itens, total e o próximo horário do
+  cliente; remarcação pelo painel, com os horários revalidados para a nova
+  data; e a migração v1→v2, que troca os dados de exemplo pelos reais sem
+  perder agendamentos nem clientes. Não foram exercitados o CRUD de estoque,
+  a edição de promoções e o cancelamento pelo cliente.
 
 ---
 
