@@ -116,8 +116,7 @@ async function ensureAdmin() {
 }
 
 try {
-  await runFile('db/schema.sql');
-  await runFile('db/seed.sql');
+  await runFile('db/setup.sql');
   await ensureAdmin();
   console.log('\nmigração concluída.');
 } catch (err) {

@@ -18,56 +18,49 @@ Como a app depende da API, **ela não abre mais por duplo clique no arquivo**.
 
 ## Como rodar
 
-### 1. Banco
+São três passos. Nada para instalar.
 
-No painel da Vercel: **Storage → Postgres**, criar e ligar ao projeto. Isso
-preenche `POSTGRES_URL` sozinho.
+**1. Criar as tabelas.** Cole [db/setup.sql](db/setup.sql) inteiro no SQL
+Editor do Neon e rode. Cria as tabelas e já insere serviços, produtos,
+promoções e os dados da barbearia. Pode rodar de novo sem medo: nada é
+duplicado e nada que o barbeiro editou no painel é sobrescrito.
 
-### 2. Variáveis de ambiente
-
-Em **Settings → Environment Variables**, marcando *Production* **e** *Preview*.
-Os nomes e para que servem estão em [.env.example](.env.example).
+**2. Uma variável na Vercel.** Em *Settings → Environment Variables*, marcando
+*Production* **e** *Preview*:
 
 ```bash
-# segredo que assina o cookie de sessão
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
-
-# hash da senha do barbeiro — cole o HASH na Vercel, nunca a senha
-npm run hash
 ```
 
-### 3. Criar as tabelas
+Esse valor é o `AUTH_SECRET`, que assina o cookie de sessão. Sem ele o login
+responde erro 500. Trocá-lo depois desloga todo mundo de uma vez.
+
+A URL do banco já vem da integração do Neon ou do Vercel Postgres — o código
+aceita `DATABASE_URL` e `POSTGRES_URL`, então não há nada a fazer aqui.
+
+**3. A conta do barbeiro.** Crie pela própria tela **Criar conta** do site, com
+a senha que quiser, e então rode uma linha no SQL Editor:
+
+```sql
+update users set role = 'admin' where lower(email) = 'seu@email.com';
+```
+
+No próximo login aparece o Painel do Barbeiro.
+
+> **Nenhuma credencial vive no repositório.** A senha é gravada pela própria
+> app como hash `scrypt` com salt, nunca em texto puro, e a tela de login não
+> anuncia o acesso do barbeiro — ela é a área do cliente.
+
+### Rodar local (opcional)
+
+Só se você quiser mexer no back-end. Precisa da CLI da Vercel:
 
 ```bash
 vercel env pull .env.development.local
 npm install
-npm run migrate
+npm run migrate    # mesmo SQL do passo 1, por linha de comando
+vercel dev
 ```
-
-O `migrate` é idempotente: cria as tabelas, insere serviços, produtos e
-promoções iniciais, e garante a conta do barbeiro a partir de `ADMIN_EMAIL` e
-`ADMIN_PASSWORD_HASH`. Rodar de novo não duplica nem sobrescreve o que o
-barbeiro já editou no painel.
-
-### 4. Subir
-
-```bash
-vercel dev     # local, em http://localhost:3000
-```
-
-### Contas
-
-| Perfil | Como entrar |
-| --- | --- |
-| Barbeiro (admin) | o `ADMIN_EMAIL` que você definiu, com a senha cujo hash você gerou |
-| Cliente | pela tela **Criar conta** |
-
-> **Nenhuma credencial vive no repositório.** A conta do barbeiro vem das
-> variáveis de ambiente, e a senha é guardada como hash `scrypt` com salt —
-> nunca em texto puro. A tela de login é a área do cliente e não anuncia o
-> acesso do barbeiro.
->
-> Trocar o `AUTH_SECRET` invalida todas as sessões de uma vez.
 
 ---
 
@@ -96,11 +89,10 @@ api/
   products/, rules/     CRUD do painel
   orders.js, settings.js
 db/
-  schema.sql            tabelas
-  seed.sql              serviços, produtos e promoções iniciais
+  setup.sql             tabelas + dados iniciais, numa colagem só
 scripts/
-  migrate.mjs           cria as tabelas e garante a conta do barbeiro
-  hash-password.mjs     gera o ADMIN_PASSWORD_HASH
+  migrate.mjs           roda o setup.sql por linha de comando (opcional)
+  hash-password.mjs     gera um hash de senha, se precisar criar admin por SQL
 apresentacao.html       apresentação animada (arquivo único, toca no navegador)
 motion/                 projeto Remotion que gera o vídeo .mp4 da apresentação
 ```
